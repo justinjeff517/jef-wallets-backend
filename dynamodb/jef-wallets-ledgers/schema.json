@@ -1,0 +1,28 @@
+{ 
+    "table":"jef-wallets-ledgers",
+    "attributes":{
+        "pk":"string",
+        "sk":"string",
+        "entity_number":"string",
+        "transaction_number":"string-10-digits",
+        "date":"string-YYYY-MM-DD",
+        "date_name":"string-Month, Day, Year, Weekday",
+        "created":"string-iso8601",
+        "created_name":"string-Month, Day, Year, Weekday, Hour Minute AM/PM", 
+        "created_by":"string-5-digits-employee-number",
+        "type":"string-credit|debit",
+        "description":"string",
+        "balance_before":"number",
+        "amount":"number",
+        "balance_after":"number",
+        "reference_type":"string",
+        "reference_number":"string"
+
+    }, 
+    "main_index":{
+        "pk":"<entity_number>",
+        "sk":"<created>#<transaction_number>"
+    }
+
+
+}
