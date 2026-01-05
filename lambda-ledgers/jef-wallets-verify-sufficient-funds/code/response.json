@@ -1,0 +1,5 @@
+{
+    "is_sufficient":"boolean",
+    "message":"string",
+    "entity_number":"string"
+}
