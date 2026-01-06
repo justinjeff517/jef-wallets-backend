@@ -14,9 +14,7 @@
         "description":"string",
         "balance_before":"number",
         "amount":"number",
-        "balance_after":"number",
-        "reference_type":"string",
-        "reference_number":"string"
+        "balance_after":"number"
 
     }, 
     "main_index":{
