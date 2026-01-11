@@ -1,195 +1,170 @@
 import os
-import boto3
-from datetime import datetime, timezone, timedelta
+import json
 from decimal import Decimal
-from boto3.dynamodb.conditions import Key
+from datetime import datetime, timezone, timedelta
+
+import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
-AWS_REGION = (os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "ap-southeast-1").strip()
-LEDGERS_TABLE = (os.getenv("LEDGERS_TABLE") or "jef-wallets-ledgers").strip()
+LEDGERS_TABLE = os.getenv("LEDGERS_TABLE") or "jef-wallets-ledgers"
+AWS_REGION = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "ap-southeast-1"
 
-_TZ_MANILA = timezone(timedelta(hours=8))
-
-ddb = boto3.resource(
+_ddb = boto3.resource(
     "dynamodb",
     region_name=AWS_REGION,
     config=Config(retries={"max_attempts": 10, "mode": "standard"}),
 )
-table = ddb.Table(LEDGERS_TABLE)
+_table = _ddb.Table(LEDGERS_TABLE)
 
-def _clean(s: str) -> str:
-    s = (s or "").strip()
-    if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
-        s = s[1:-1].strip()
-    return s
+_TZ = timezone(timedelta(hours=8))  # Asia/Manila fixed offset
 
-def _as_decimal(n) -> Decimal:
-    if isinstance(n, Decimal):
-        return n
-    if isinstance(n, (int, float, str)):
-        try:
-            return Decimal(str(n))
-        except Exception:
-            return Decimal("0")
-    return Decimal("0")
 
-def _fmt_date_name(dt: datetime) -> str:
-    s = dt.astimezone(_TZ_MANILA).strftime("%B %d, %Y, %A")
-    return s.replace(", 0", ", ").replace(" 0", " ")
+def _as_str(v):
+    return v.strip() if isinstance(v, str) else ""
 
-def _fmt_created_name(dt: datetime) -> str:
-    s = dt.astimezone(_TZ_MANILA).strftime("%B %d, %Y, %A, %I:%M %p")
-    return s.replace(", 0", ", ").replace(" 0", " ").replace(":00 ", " ")
 
-def _get_latest_balance(entity_number: str) -> Decimal:
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(entity_number),
-        ScanIndexForward=False,
-        Limit=1,
-    )
-    items = resp.get("Items") or []
-    if not items:
-        return Decimal("0")
-    return _as_decimal(items[0].get("balance_after", 0))
-
-def _get_next_ledger_number(entity_number: str) -> str:
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(entity_number),
-        ScanIndexForward=False,
-        Limit=1,
-    )
-    items = resp.get("Items") or []
-    if not items:
-        return "0000000001"
-
-    last_sk = str(items[0].get("sk") or "")
-    last_ln = ""
-    if "#" in last_sk:
-        last_ln = last_sk.split("#", 1)[1].strip()
-
-    try:
-        n = int(last_ln) + 1
-    except Exception:
-        n = 1
-
-    return str(n).zfill(10)
-
-def _find_existing_by_idempotency(entity_number: str, idempotency_key: str):
-    resp = table.query(
-        KeyConditionExpression=Key("pk").eq(entity_number),
-        ScanIndexForward=False,
-        Limit=50,
-    )
-    items = resp.get("Items") or []
-    for it in items:
-        if _clean(it.get("idempotency_key", "")) == idempotency_key:
-            return it
+def _as_num(v):
+    if isinstance(v, (int, float, Decimal)):
+        return Decimal(str(v))
+    if isinstance(v, str):
+        s = v.strip()
+        if s == "":
+            return None
+        return Decimal(s)
     return None
 
-def create_one_ledger(payload: dict) -> dict:
-    entity_number = _clean(payload.get("entity_number", ""))
-    sender_entity_number = _clean(payload.get("sender_entity_number", ""))
-    sender_entity_name = _clean(payload.get("sender_entity_name", ""))
-    receiver_entity_number = _clean(payload.get("receiver_entity_number", ""))
-    receiver_entity_name = _clean(payload.get("receiver_entity_name", ""))
 
-    typ = _clean(payload.get("type", "")).lower()
-    description = _clean(payload.get("description", ""))
-    amount = _as_decimal(payload.get("amount", 0))
-    idempotency_key = _clean(payload.get("idempotency_key", ""))
+def _iso_now():
+    return datetime.now(_TZ).isoformat(timespec="seconds")
 
-    if not entity_number:
-        return {"is_created": False, "message": "entity_number is required"}
-    if not sender_entity_number or not sender_entity_name:
-        return {"is_created": False, "message": "sender_entity_number and sender_entity_name are required"}
-    if not receiver_entity_number or not receiver_entity_name:
-        return {"is_created": False, "message": "receiver_entity_number and receiver_entity_name are required"}
-    if typ not in ("credit", "debit"):
-        return {"is_created": False, "message": "type must be 'credit' or 'debit'"}
-    if not description:
-        return {"is_created": False, "message": "description is required"}
-    if amount <= 0:
-        return {"is_created": False, "message": "amount must be > 0"}
-    if not idempotency_key:
-        return {"is_created": False, "message": "idempotency_key is required (uuidv4)"}
 
-    # idempotent check (best-effort; assumes same entity_number)
-    existing = _find_existing_by_idempotency(entity_number, idempotency_key)
-    if existing:
-        ln = _clean(existing.get("ledger_number", ""))
-        return {"is_created": True, "message": f"Already created ledger {ln} (idempotency_key matched)"}
+def _date_ymd(iso_ts):
+    return iso_ts[:10]
 
-    now = datetime.now(_TZ_MANILA)
-    created = now.isoformat(timespec="seconds")
-    date = now.strftime("%Y-%m-%d")
 
-    balance_before = _get_latest_balance(entity_number)
-    balance_after = balance_before + amount if typ == "credit" else balance_before - amount
+def _date_name(iso_ts):
+    # "January 2, 2026, Friday"
+    dt = datetime.fromisoformat(iso_ts)
+    return f"{dt.strftime('%B')} {dt.day}, {dt.year}, {dt.strftime('%A')}"
 
-    ledger_number = _get_next_ledger_number(entity_number)
-    pk = entity_number
-    sk = f"{created}#{ledger_number}"
 
-    item = {
-        "pk": pk,
-        "sk": sk,
-        "entity_number": entity_number,
+def _created_name(iso_ts):
+    # "January 2, 2026, Friday, 9:05 AM"
+    dt = datetime.fromisoformat(iso_ts)
+    hour = dt.strftime("%I").lstrip("0") or "0"
+    minute = dt.strftime("%M")
+    ampm = dt.strftime("%p")
+    return f"{dt.strftime('%B')} {dt.day}, {dt.year}, {dt.strftime('%A')}, {hour}:{minute} {ampm}"
 
-        "sender_entity_number": sender_entity_number,
-        "sender_entity_name": sender_entity_name,
-        "receiver_entity_number": receiver_entity_number,
-        "receiver_entity_name": receiver_entity_name,
 
-        "ledger_number": ledger_number,
-        "date": date,
-        "date_name": _fmt_date_name(now),
-        "created": created,
-        "created_name": _fmt_created_name(now),
-        "created_by": "00000",
-
-        "type": typ,
-        "description": description,
-        "balance_before": balance_before,
-        "amount": amount,
-        "balance_after": balance_after,
-
-        "idempotency_key": idempotency_key,
+def create_one_ledger(payload, *, enforce_idempotency=True):
+    """
+    Payload format:
+    {
+      "account_number": "string",
+      "sender_account_number":"string",
+      "sender_account_name":"string",
+      "receiver_account_number":"string",
+      "receiver_account_name":"string",
+      "type":"credit|debit",
+      "description":"string",
+      "amount":"number",
+      "created_by":"string",
+      "ledger_id":"string-uuidv4"
     }
 
+    Response:
+    {"is_created": bool, "message": str}
+    """
     try:
-        table.put_item(
-            Item=item,
-            ConditionExpression="attribute_not_exists(pk) AND attribute_not_exists(sk)",
-        )
-        return {"is_created": True, "message": f"Created ledger {ledger_number} (balance_after={balance_after})"}
+        account_number = _as_str(payload.get("account_number"))
+        sender_account_number = _as_str(payload.get("sender_account_number"))
+        sender_account_name = _as_str(payload.get("sender_account_name"))
+        receiver_account_number = _as_str(payload.get("receiver_account_number"))
+        receiver_account_name = _as_str(payload.get("receiver_account_name"))
+        typ = _as_str(payload.get("type")).lower()
+        description = _as_str(payload.get("description"))
+        created_by = _as_str(payload.get("created_by"))
+        ledger_id = _as_str(payload.get("ledger_id"))
+        amount = _as_num(payload.get("amount"))
+
+        if not account_number:
+            return {"is_created": False, "message": "account_number is required"}
+        if not ledger_id:
+            return {"is_created": False, "message": "ledger_id is required"}
+        if typ not in ("credit", "debit"):
+            return {"is_created": False, "message": "type must be credit or debit"}
+        if amount is None:
+            return {"is_created": False, "message": "amount is required and must be a number"}
+        if amount <= 0:
+            return {"is_created": False, "message": "amount must be > 0"}
+        if not created_by:
+            return {"is_created": False, "message": "created_by is required"}
+
+        created = _iso_now()
+        date = _date_ymd(created)
+        date_name = _date_name(created)
+        created_name = _created_name(created)
+
+        # NOTE: balance_before/balance_after are not provided in your payload.
+        # This write will store amount and metadata; you can later compute balances
+        # or extend this function to update balances atomically.
+        item = {
+            "pk": account_number,     # main index pk <account_number>
+            "sk": ledger_id,          # main index sk <ledger_id>
+
+            "account_number": account_number,
+            "sender_account_number": sender_account_number,
+            "sender_account_name": sender_account_name,
+            "receiver_account_number": receiver_account_number,
+            "receiver_account_name": receiver_account_name,
+
+            "ledger_id": ledger_id,
+            "date": date,
+            "date_name": date_name,
+            "created": created,
+            "created_name": created_name,
+            "created_by": created_by,
+
+            "type": typ,
+            "description": description,
+            "amount": amount,
+        }
+
+        put_kwargs = {"Item": item}
+
+        if enforce_idempotency:
+            # prevent overwriting an existing ledger with same pk+sk
+            put_kwargs["ConditionExpression"] = "attribute_not_exists(pk) AND attribute_not_exists(sk)"
+
+        _table.put_item(**put_kwargs)
+
+        return {"is_created": True, "message": "Ledger created"}
+
     except ClientError as e:
         code = (e.response.get("Error") or {}).get("Code") or ""
         if code == "ConditionalCheckFailedException":
-            # retry-safe: check again by idempotency_key
-            existing2 = _find_existing_by_idempotency(entity_number, idempotency_key)
-            if existing2:
-                ln = _clean(existing2.get("ledger_number", ""))
-                return {"is_created": True, "message": f"Already created ledger {ln} (idempotency_key matched)"}
-            return {"is_created": False, "message": "Ledger already exists (pk+sk collision). Retry."}
+            return {"is_created": False, "message": "ledger_id already exists for this account_number"}
         return {"is_created": False, "message": f"DynamoDB error: {code}"}
     except Exception as e:
-        return {"is_created": False, "message": f"Error: {e}"}
-
-# --- Example ---
-test_payload = {
-    "entity_number": "1001",
-    "sender_entity_number": "1001",
-    "sender_entity_name": "Ellorimo Farm",
-    "receiver_entity_number": "1002",
-    "receiver_entity_name": "JEF Eggstore",
-    "type": "debit",
-    "description": "Feed purchase payment to JEF Eggstore",
-    "amount": 850,
-    "idempotency_key": "2f7a9c1e-0a6b-4a2d-8f1c-5c9b2d7a1e0f",
-}
+        return {"is_created": False, "message": f"Unhandled error: {type(e).__name__}: {e}"}
 
 
-create_one_ledger(test_payload)
-resp = create_one_ledger(test_payload)
-print(resp)
+# ---- example usage ----
+if __name__ == "__main__":
+    sample_payload = {
+  "account_number": "1001",
+  "sender_account_number": "1002",
+  "sender_account_name": "JEF Eggstore",
+  "receiver_account_number": "1001",
+  "receiver_account_name": "Ellorimo Farm",
+  "type": "credit",
+  "description": "Egg sales remittance (daily cash drop) - PM batch",
+  "amount": 1800,
+  "created_by": "00031",
+  "ledger_id": "66f906c3-1dd9-40dd-bd83-b11f6d98c676"
+    }
+
+    resp = create_one_ledger(sample_payload)
+    print(json.dumps(resp, indent=2))
