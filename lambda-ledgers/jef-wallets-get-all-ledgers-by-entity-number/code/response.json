@@ -3,8 +3,12 @@
     "message":"string",
     "ledgers":[
         {
-            "entity_number":"string",
-            "transaction_number":"string-10-digits",
+            "account_number":"string", 
+            "sender_account_number":"string",
+            "sender_account_name":"string",
+            "receiver_account_number":"string",
+            "receiver_account_name":"string",
+            "ledger_id":"string-uuidv4",
             "date":"string-YYYY-MM-DD",
             "date_name":"string-Month, Day, Year, Weekday",
             "created":"string-iso8601",

@@ -42,10 +42,23 @@ def _safe_str(x):
     return "" if x is None else str(x)
 
 
+def _json_default(o):
+    if isinstance(o, Decimal):
+        if o % 1 == 0:
+            return int(o)
+        return float(o)
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+
+
 def _normalize_ledger(it: dict) -> dict:
+    # Response shape: account_* + ledger_id + balance fields (your schema)
     return {
-        "entity_number": _safe_str(it.get("entity_number")),
-        "transaction_number": _safe_str(it.get("transaction_number")),
+        "account_number": _safe_str(it.get("account_number")),
+        "sender_account_number": _safe_str(it.get("sender_account_number")),
+        "sender_account_name": _safe_str(it.get("sender_account_name")),
+        "receiver_account_number": _safe_str(it.get("receiver_account_number")),
+        "receiver_account_name": _safe_str(it.get("receiver_account_name")),
+        "ledger_id": _safe_str(it.get("ledger_id") or it.get("sk")),
         "date": _safe_str(it.get("date")),
         "date_name": _safe_str(it.get("date_name")),
         "created": _safe_str(it.get("created")),
@@ -60,6 +73,7 @@ def _normalize_ledger(it: dict) -> dict:
 
 
 def get_all_ledgers_by_entity_number(entity_number: str) -> dict:
+    # pk = entity_number
     entity_number = _safe_str(entity_number).strip()
     if not entity_number:
         return {"exists": False, "message": "Missing entity_number.", "ledgers": []}
@@ -71,13 +85,12 @@ def get_all_ledgers_by_entity_number(entity_number: str) -> dict:
         while True:
             kwargs = {
                 "KeyConditionExpression": Key("pk").eq(entity_number),
-                "ScanIndexForward": True,  # oldest -> newest (set False for newest -> oldest)
             }
             if last_evaluated_key:
                 kwargs["ExclusiveStartKey"] = last_evaluated_key
 
             resp = _table.query(**kwargs)
-            items.extend(resp.get("Items", []))
+            items.extend(resp.get("Items", []) or [])
 
             last_evaluated_key = resp.get("LastEvaluatedKey")
             if not last_evaluated_key:
@@ -92,6 +105,9 @@ def get_all_ledgers_by_entity_number(entity_number: str) -> dict:
                 "ledgers": [],
             }
 
+        # Stable sort (since SK is uuid). If you later change SK to created/date, remove this and rely on query order.
+        ledgers.sort(key=lambda x: (x.get("date", ""), x.get("created", ""), x.get("ledger_id", "")))
+
         return {"exists": True, "message": f"Found {len(ledgers)} ledger(s).", "ledgers": ledgers}
 
     except ClientError as e:
@@ -105,7 +121,10 @@ def get_all_ledgers_by_entity_number(entity_number: str) -> dict:
 
 
 def _extract_entity_number(event: dict) -> str:
-    # supports: event["entity_number"], event["body"] json string, event["queryStringParameters"]["entity_number"]
+    # supports:
+    # - event["entity_number"]
+    # - JSON body {"entity_number":"1001"}
+    # - queryStringParameters.entity_number
     if not isinstance(event, dict):
         return ""
 
@@ -133,7 +152,6 @@ def lambda_handler(event, context):
     entity_number = _extract_entity_number(event)
     out = get_all_ledgers_by_entity_number(entity_number)
 
-    # API Gateway / Lambda Proxy compatible response
     status_code = 200 if out.get("exists") else 404
     if out.get("message") == "Missing entity_number.":
         status_code = 400
@@ -144,5 +162,5 @@ def lambda_handler(event, context):
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*",
         },
-        "body": json.dumps(out, ensure_ascii=False),
+        "body": json.dumps(out, default=_json_default, ensure_ascii=False),
     }

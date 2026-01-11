@@ -1,11 +1,12 @@
 {
-    "entity_number":"string",
-    "sender_entity_number": "string",
-    "sender_entity_name": "string",
-    "receiver_entity_number": "string",
-    "receiver_entity_name": "string",
+    "account_number":"string", 
+    "sender_account_number":"string",
+    "sender_account_name":"string",
+    "receiver_account_number":"string",
+    "receiver_account_name":"string",
     "type":"string-credit|debit",
     "description":"string",
     "amount":"number",
-    "idempotency_key":"string-uuidv4"
+    "created_by":"string",
+    "ledger_id":"string-uuidv4"
 }

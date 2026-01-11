@@ -1,0 +1,16 @@
+{ 
+    "table":"jef-wallets-accounts",
+    "attributes":{
+        "pk":"string",
+        "account_number":"string", 
+        "account_name":"string",
+        "created":"string-iso8601",
+        "created_name":"string-Month, Day, Year, Weekday, Hour Minute AM/PM", 
+        "created_by":"string-5-digits-employee-number"
+    }, 
+    "main_index":{
+        "pk":"<account_number>"
+    }
+
+
+}
