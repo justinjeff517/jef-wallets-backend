@@ -8,7 +8,7 @@
         "sender_entity_name":"string",
         "receiver_entity_number":"string",
         "receiver_entity_name":"string",
-        "ledger_number":"string-10-digits",
+        "ledger_id":"string-uuidv4",
         "date":"string-YYYY-MM-DD",
         "date_name":"string-Month, Day, Year, Weekday",
         "created":"string-iso8601",
@@ -24,7 +24,7 @@
     }, 
     "main_index":{
         "pk":"<entity_number>",
-        "sk":"<created>#<ledger_number>"
+        "sk":"<created>#<ledger_id>"
     }
 
 
