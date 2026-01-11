@@ -1,4 +1,6 @@
+import json
 import boto3
+from decimal import Decimal
 from boto3.dynamodb.types import TypeDeserializer
 
 TABLE_NAME = "jef-wallets-ledgers"
@@ -29,6 +31,13 @@ def get_all_items(table_name=TABLE_NAME):
 
     return out
 
+def _json_default(o):
+    if isinstance(o, Decimal):
+        if o % 1 == 0:
+            return int(o)
+        return float(o)
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+
 items = get_all_items()
 print("count:", len(items))
-print(items)
+print(json.dumps(items, indent=2, ensure_ascii=False, default=_json_default))

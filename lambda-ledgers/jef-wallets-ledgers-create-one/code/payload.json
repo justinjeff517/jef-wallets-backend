@@ -1,0 +1,11 @@
+{
+    "entity_number":"string",
+    "sender_entity_number": "string",
+    "sender_entity_name": "string",
+    "receiver_entity_number": "string",
+    "receiver_entity_name": "string",
+    "type":"string-credit|debit",
+    "description":"string",
+    "amount":"number",
+    "idempotency_key":"string-uuidv4"
+}
