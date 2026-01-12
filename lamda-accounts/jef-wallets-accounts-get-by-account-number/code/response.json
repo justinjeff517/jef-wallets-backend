@@ -1,0 +1,8 @@
+{
+    "exists":"boolean",
+    "message":"string",
+    "account":{
+        "account_number":"string", 
+        "account_name":"string"
+    }
+}
