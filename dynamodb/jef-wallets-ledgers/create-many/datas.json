@@ -16,9 +16,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Inter-branch transfer",
-    "balance_before": 534390,
-    "amount": 41470,
-    "balance_after": 492920
+    "amount": 41470
   },
   {
     "pk": "b711eca9-fbcb-4b1f-a955-1c40ca070ece",
@@ -37,9 +35,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Fuel replenishment",
-    "balance_before": 587272,
-    "amount": 73034,
-    "balance_after": 514238
+    "amount": 73034
   },
   {
     "pk": "7d08f885-3739-4a5d-a554-b12953d91167",
@@ -58,9 +54,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Electricity bill",
-    "balance_before": 744652,
-    "amount": 24106,
-    "balance_after": 720546
+    "amount": 24106
   },
   {
     "pk": "9c0d0502-5fa7-4026-a5f2-b596ed39534d",
@@ -79,9 +73,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Packaging materials",
-    "balance_before": 700308,
-    "amount": 48779,
-    "balance_after": 651529
+    "amount": 48779
   },
   {
     "pk": "1ae248f2-f357-4f0a-a8dc-240ef833876c",
@@ -100,9 +92,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Delivery & logistics",
-    "balance_before": 514238,
-    "amount": 18409,
-    "balance_after": 495829
+    "amount": 18409
   },
   {
     "pk": "ed9dd294-3351-46c0-909d-72379d921a3f",
@@ -121,9 +111,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Coffee beans purchase",
-    "balance_before": 407256,
-    "amount": 21644,
-    "balance_after": 385612
+    "amount": 21644
   },
   {
     "pk": "e83bf27a-7f0a-47fd-b8b0-c04f0221f2ad",
@@ -142,9 +130,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Feed purchase",
-    "balance_before": 648158,
-    "amount": 85352,
-    "balance_after": 562806
+    "amount": 85352
   },
   {
     "pk": "b56f4fdc-9877-4710-a96a-9b3aa72ba532",
@@ -163,9 +149,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Hardware restock",
-    "balance_before": 540657,
-    "amount": 62961,
-    "balance_after": 477696
+    "amount": 62961
   },
   {
     "pk": "9b4b4c86-fbf6-4bd4-99f4-1b67f0e44107",
@@ -184,9 +168,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Software subscription",
-    "balance_before": 686610,
-    "amount": 5907,
-    "balance_after": 680703
+    "amount": 5907
   },
   {
     "pk": "0fe8712a-eae0-42aa-a5ba-444ac4f94051",
@@ -205,9 +187,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Egg tray restock",
-    "balance_before": 691906,
-    "amount": 18623,
-    "balance_after": 673283
+    "amount": 18623
   },
   {
     "pk": "d15a1f0e-3ca1-48d4-a0e6-5a0f78c6a5c4",
@@ -226,9 +206,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Water bill",
-    "balance_before": 723420,
-    "amount": 4968,
-    "balance_after": 718452
+    "amount": 4968
   },
   {
     "pk": "f8930d45-c6aa-4f8c-9e9d-75e9d3d2f9f2",
@@ -247,9 +225,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Delivery & logistics",
-    "balance_before": 690024,
-    "amount": 12892,
-    "balance_after": 677132
+    "amount": 12892
   },
   {
     "pk": "c66a87bb-0c41-41f5-9f71-4026df3680ef",
@@ -268,9 +244,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Fuel replenishment",
-    "balance_before": 882600,
-    "amount": 90417,
-    "balance_after": 792183
+    "amount": 90417
   },
   {
     "pk": "d4d8c918-6d83-4b38-9f62-00e6eb2f10ef",
@@ -289,9 +263,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Electricity bill",
-    "balance_before": 495829,
-    "amount": 17983,
-    "balance_after": 477846
+    "amount": 17983
   },
   {
     "pk": "8ab8c9f9-cfca-4f1d-97c8-5e3dfbf1f3a7",
@@ -310,9 +282,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Payroll top-up",
-    "balance_before": 417900,
-    "amount": 72140,
-    "balance_after": 345760
+    "amount": 72140
   },
   {
     "pk": "0b44d98c-8ea0-4d55-a32c-700b3f6af9cc",
@@ -331,9 +301,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Packaging materials",
-    "balance_before": 492920,
-    "amount": 18931,
-    "balance_after": 473989
+    "amount": 18931
   },
   {
     "pk": "b0d2d05a-86b9-4de4-a8d1-3f7a3fb2b2b5",
@@ -352,9 +320,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Water bill",
-    "balance_before": 263746,
-    "amount": 3127,
-    "balance_after": 260619
+    "amount": 3127
   },
   {
     "pk": "db2c08d6-7d62-4b9f-9d18-7dfd4a1d0d6a",
@@ -373,9 +339,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Transfer to clearing",
-    "balance_before": 562806,
-    "amount": 69244,
-    "balance_after": 493562
+    "amount": 69244
   },
   {
     "pk": "b1c19ca8-4b64-44a9-9ac5-f51b3c7b18ff",
@@ -394,9 +358,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Internet bill",
-    "balance_before": 677132,
-    "amount": 2890,
-    "balance_after": 674242
+    "amount": 2890
   },
   {
     "pk": "2a629b77-2c3a-4c6f-a3d1-0e254ab0cfb0",
@@ -415,9 +377,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Inter-branch transfer",
-    "balance_before": 651529,
-    "amount": 25000,
-    "balance_after": 626529
+    "amount": 25000
   },
   {
     "pk": "b2e1c18d-b2e5-4a84-88e8-5f7d8fb10943",
@@ -436,9 +396,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Coffee beans purchase",
-    "balance_before": 370010,
-    "amount": 17340,
-    "balance_after": 352670
+    "amount": 17340
   },
   {
     "pk": "61f9716f-7de2-4b0e-b70c-a5aa0f054d74",
@@ -457,9 +415,7 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Delivery & logistics",
-    "balance_before": 673283,
-    "amount": 15240,
-    "balance_after": 658043
+    "amount": 15240
   },
   {
     "pk": "aa6d31c4-7e12-49ae-b2d7-4c0f3c2bcb1a",
@@ -478,8 +434,6 @@
     "created_by": "00031",
     "type": "debit",
     "description": "Transfer to clearing",
-    "balance_before": 680703,
-    "amount": 48500,
-    "balance_after": 632203
+    "amount": 48500
   }
 ]

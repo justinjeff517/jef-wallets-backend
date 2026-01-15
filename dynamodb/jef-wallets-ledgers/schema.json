@@ -17,9 +17,7 @@
         "created_by":"string-5-digits-employee-number",
         "type":"string-credit|debit",
         "description":"string",
-        "balance_before":"number",
-        "amount":"number",
-        "balance_after":"number"
+        "amount":"number"
     }, 
     "main_index":{
         "pk":"<ledger_id>"

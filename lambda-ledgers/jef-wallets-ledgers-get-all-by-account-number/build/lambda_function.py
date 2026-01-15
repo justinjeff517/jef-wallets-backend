@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from decimal import Decimal
 from datetime import datetime, timezone, timedelta
 
@@ -11,6 +12,11 @@ AWS_REGION = (os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "ap-
 TABLE_NAME = (os.getenv("WALLETS_LEDGERS_TABLE") or "jef-wallets-ledgers").strip()
 GSI_1_NAME = (os.getenv("WALLETS_LEDGERS_GSI_1_NAME") or "gsi_1").strip()
 
+# DynamoDB provisioned baseline (Free tier): 25 RCU. Use 22 as requested.
+RCU_PER_SEC = 22
+SAFETY = 0.9  # use 90% of limit
+_effective_rcu = max(1.0, RCU_PER_SEC * SAFETY)  # 19.8
+
 _TZ_MANILA = timezone(timedelta(hours=8))
 
 ddb = boto3.resource(
@@ -18,9 +24,11 @@ ddb = boto3.resource(
     region_name=AWS_REGION,
     config=Config(retries={"max_attempts": 10, "mode": "standard"}),
 )
-
 table = ddb.Table(TABLE_NAME)
 
+# ----------------------------
+# HELPERS
+# ----------------------------
 def _as_str(v):
     return v.strip() if isinstance(v, str) else ""
 
@@ -45,7 +53,7 @@ def _parse_iso_dt(s: str):
     except Exception:
         return None
 
-def _human_age(created_iso: str) -> str:
+def _human_elapsed_hhmmss(created_iso: str) -> str:
     dt = _parse_iso_dt(created_iso)
     if not dt:
         return ""
@@ -58,34 +66,11 @@ def _human_age(created_iso: str) -> str:
     if total_seconds < 0:
         total_seconds = 0
 
-    # seconds / minutes / hours
-    if total_seconds < 60:
-        return f"{total_seconds} s ago"
-    if total_seconds < 3600:
-        m = total_seconds // 60
-        s = total_seconds % 60
-        if s == 0:
-            return f"{m}m ago"
-        return f"{m}m {s} s ago"
-    if total_seconds < 86400:
-        h = total_seconds // 3600
-        rem = total_seconds % 3600
-        m = rem // 60
-        if m == 0:
-            return f"{h} hours ago" if h != 1 else "1 hour ago"
-        return f"{h} hours {m}m ago" if h != 1 else f"1 hour {m}m ago"
-
-    # days
-    days = total_seconds // 86400
-    if days < 30:
-        return f"{days} days ago" if days != 1 else "1 day ago"
-
-    # months + days (approx: 30d/month)
-    months = days // 30
-    rem_days = days % 30
-    if rem_days == 0:
-        return f"{months} months ago" if months != 1 else "1 month ago"
-    return f"{months} months {rem_days} days ago" if months != 1 else f"1 month {rem_days} days ago"
+    h = total_seconds // 3600
+    rem = total_seconds % 3600
+    m = rem // 60
+    s = rem % 60
+    return f"{h:02d}:{m:02d}:{s:02d} ago"
 
 def _pick_ledger_fields(it: dict) -> dict:
     created_iso = _as_str(it.get("created"))
@@ -103,40 +88,73 @@ def _pick_ledger_fields(it: dict) -> dict:
         "created_by": _as_str(it.get("created_by")),
         "type": _as_str(it.get("type")),
         "description": _as_str(it.get("description")),
-        "balance_before": _to_jsonable(it.get("balance_before", 0)),
         "amount": _to_jsonable(it.get("amount", 0)),
-        "balance_after": _to_jsonable(it.get("balance_after", 0)),
-        "elapsed_time": _human_age(created_iso),
+        "elapsed_time": _human_elapsed_hhmmss(created_iso),
     }
 
-def _sort_by_created_iso(ledgers: list) -> list:
-    def keyfn(x):
-        s = _as_str(x.get("created"))
-        try:
-            return datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
-        except Exception:
-            return float("-inf")
-    return sorted(ledgers, key=keyfn)
+def _created_ts(s: str) -> float:
+    dt = _parse_iso_dt(s)
+    if not dt:
+        return float("-inf")
+    return dt.astimezone(_TZ_MANILA).timestamp()
+
+def _sort_by_created_iso_desc(ledgers: list) -> list:
+    return sorted(ledgers, key=lambda x: _created_ts(_as_str(x.get("created"))), reverse=True)
+
+def _throttle_rcu(consumed_rcu: float):
+    # Sleep long enough so average consumption stays under the configured RCU/sec.
+    # For query, DynamoDB returns ConsumedCapacity.CapacityUnits.
+    if consumed_rcu is None:
+        return
+    if consumed_rcu <= 0:
+        return
+    sleep_s = float(consumed_rcu) / float(_effective_rcu)
+    if sleep_s > 0:
+        time.sleep(sleep_s)
 
 def get_ledgers_by_account_number(account_number: str, limit: int = 200) -> dict:
     account_number = _as_str(account_number)
     if not account_number:
         return {"exists": False, "message": "Missing account_number", "ledgers": []}
 
+    items = []
+    last_evaluated_key = None
+
     try:
-        resp = table.query(
-            IndexName=GSI_1_NAME,
-            KeyConditionExpression=Key("gsi_1_pk").eq(account_number),
-            ScanIndexForward=True,
-            Limit=limit,
-        )
-        items = resp.get("Items", []) or []
+        while True:
+            page_limit = max(1, min(200, limit - len(items)))  # keep pages small and consistent
+            if page_limit <= 0:
+                break
+
+            kwargs = {
+                "IndexName": GSI_1_NAME,
+                "KeyConditionExpression": Key("gsi_1_pk").eq(account_number),
+                "ScanIndexForward": True,
+                "Limit": page_limit,
+                "ReturnConsumedCapacity": "TOTAL",
+            }
+            if last_evaluated_key:
+                kwargs["ExclusiveStartKey"] = last_evaluated_key
+
+            resp = table.query(**kwargs)
+
+            cap = (resp.get("ConsumedCapacity") or {}).get("CapacityUnits")
+            if cap is not None:
+                _throttle_rcu(float(cap))
+
+            page_items = resp.get("Items", []) or []
+            items.extend(page_items)
+
+            last_evaluated_key = resp.get("LastEvaluatedKey")
+            if not last_evaluated_key:
+                break
+
     except Exception as e:
         return {"exists": False, "message": f"Query failed: {str(e)}", "ledgers": []}
 
     items = _to_jsonable(items)
     ledgers = [_pick_ledger_fields(it) for it in items]
-    ledgers = _sort_by_created_iso(ledgers)
+    ledgers = _sort_by_created_iso_desc(ledgers)
 
     exists = len(ledgers) > 0
     message = "Ledgers found" if exists else "No ledgers found"

@@ -16,9 +16,7 @@
             "created_by":"string-5-digits-employee-number",
             "type":"string-credit|debit",
             "description":"string",
-            "balance_before":"number",
             "amount":"number",
-            "balance_after":"number",
             "elapsed_time":"string"
         } 
     

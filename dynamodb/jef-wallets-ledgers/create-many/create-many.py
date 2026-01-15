@@ -27,26 +27,80 @@ def load_items(path):
     raise ValueError("datas.json must be an object or array of objects")
 
 
+def _as_str(v):
+    return v.strip() if isinstance(v, str) else ""
+
+
+def _to_decimal(v):
+    if v is None:
+        return None
+    if isinstance(v, Decimal):
+        return v
+    if isinstance(v, (int, float)):
+        return Decimal(str(v))
+    if isinstance(v, str):
+        s = v.strip()
+        if s == "":
+            return None
+        return Decimal(s)
+    return Decimal(str(v))
+
+
 def validate_item(item):
-    pk = item.get("pk")
-    if not isinstance(pk, str) or not pk.strip():
+    if not isinstance(item, dict):
+        raise ValueError("Each item must be an object/dict")
+
+    # pk required
+    pk = _as_str(item.get("pk"))
+    if not pk:
         raise ValueError("Missing/invalid pk")
 
-    if item.get("ledger_id") is None:
+    # ledger_id must match pk
+    ledger_id = item.get("ledger_id")
+    if ledger_id is None:
         item["ledger_id"] = pk
-    elif item["ledger_id"] != pk:
-        raise ValueError("ledger_id must match pk")
+    else:
+        ledger_id = _as_str(ledger_id)
+        if not ledger_id:
+            raise ValueError("Missing/invalid ledger_id")
+        if ledger_id != pk:
+            raise ValueError("ledger_id must match pk")
 
-    for k in ("account_number", "type", "description", "date", "created"):
-        if not isinstance(item.get(k), str) or not item[k].strip():
+    # Required string fields (new schema)
+    required_str = (
+        "account_number",
+        "sender_account_number",
+        "sender_account_name",
+        "receiver_account_number",
+        "receiver_account_name",
+        "date",
+        "date_name",
+        "created",
+        "created_name",
+        "created_by",
+        "type",
+        "description",
+    )
+    for k in required_str:
+        if not _as_str(item.get(k)):
             raise ValueError(f"Missing/empty {k}")
 
     if item["type"] not in ("credit", "debit"):
         raise ValueError("type must be credit|debit")
 
-    for k in ("balance_before", "amount", "balance_after"):
-        if k in item and item[k] is not None and not isinstance(item[k], Decimal):
-            item[k] = Decimal(str(item[k]).strip())
+    # amount required number
+    item["amount"] = _to_decimal(item.get("amount"))
+    if item["amount"] is None:
+        raise ValueError("Missing/invalid amount")
+
+    # Derive indexes (new schema)
+    item["gsi_1_pk"] = _as_str(item["account_number"])
+    item["gsi_1_sk"] = f'{_as_str(item["created"])}#{_as_str(item["ledger_id"])}'
+
+    # Drop old fields if present (no longer in schema)
+    for k in ("balance_before", "balance_after"):
+        if k in item:
+            item.pop(k, None)
 
     return item
 

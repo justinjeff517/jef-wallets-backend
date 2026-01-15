@@ -2,6 +2,7 @@ import os
 import json
 from decimal import Decimal, InvalidOperation
 from datetime import datetime, timezone, timedelta
+import time
 
 import boto3
 from botocore.config import Config
@@ -118,36 +119,40 @@ def create_one_ledger(payload: dict):
     date_name = _fmt_date_name(now)
     created_name = _fmt_created_name(now)
 
-    state_key = {"pk": _state_pk(account_number)}
+    state_pk = _state_pk(account_number)
 
-    # small bounded retry for race on initial state creation
-    for _attempt in range(1, 6):
+    # Retry loop for handling concurrent updates
+    max_attempts = 5
+    for attempt in range(1, max_attempts + 1):
         try:
-            state_resp = table.get_item(Key=state_key)
+            # Get current state
+            state_resp = table.get_item(Key={"pk": state_pk}, ConsistentRead=True)
             state_item = state_resp.get("Item")
             state_exists = bool(state_item)
 
             if state_exists:
                 latest_balance = _to_decimal(state_item.get("latest_balance")) or Decimal("0")
-                version = state_item.get("version")
+                version = state_item.get("version", 0)
                 try:
                     version = int(version)
-                except Exception:
+                except (TypeError, ValueError):
                     version = 0
             else:
                 latest_balance = Decimal("0")
                 version = 0
 
+            # Calculate new balance
             balance_before = latest_balance
             if typ == "credit":
                 balance_after = balance_before + amount
             else:
                 balance_after = balance_before - amount
 
-            # optional: block negative balances
+            # Optional: block negative balances
             # if balance_after < 0:
             #     return {"is_created": False, "message": "insufficient balance", "ledger_id": ledger_id}
 
+            # Prepare ledger item
             ledger_item = {
                 "pk": ledger_id,
                 "gsi_1_pk": account_number,
@@ -170,27 +175,17 @@ def create_one_ledger(payload: dict):
                 "balance_after": balance_after,
             }
 
+            # Execute transaction
             if state_exists:
-                # Transact:
-                # 1) ConditionCheck state version unchanged
-                # 2) Update state latest_balance + bump version
-                # 3) Put ledger (unique pk)
+                # Update existing state with version check
                 ddb_client.transact_write_items(
                     TransactItems=[
                         {
-                            "ConditionCheck": {
-                                "TableName": TABLE_NAME,
-                                "Key": {"pk": _ddb(state_key["pk"])},
-                                "ConditionExpression": "#v = :v",
-                                "ExpressionAttributeNames": {"#v": "version"},
-                                "ExpressionAttributeValues": {":v": _ddb(version)},
-                            }
-                        },
-                        {
                             "Update": {
                                 "TableName": TABLE_NAME,
-                                "Key": {"pk": _ddb(state_key["pk"])},
-                                "UpdateExpression": "SET #lb = :lb, #v = :v2, #u = :u, #un = :un",
+                                "Key": {"pk": {"S": state_pk}},
+                                "UpdateExpression": "SET #lb = :lb, #v = :new_version, #u = :u, #un = :un",
+                                "ConditionExpression": "#v = :current_version",
                                 "ExpressionAttributeNames": {
                                     "#lb": "latest_balance",
                                     "#v": "version",
@@ -199,7 +194,8 @@ def create_one_ledger(payload: dict):
                                 },
                                 "ExpressionAttributeValues": {
                                     ":lb": _ddb(balance_after),
-                                    ":v2": _ddb(version + 1),
+                                    ":new_version": _ddb(version + 1),
+                                    ":current_version": _ddb(version),
                                     ":u": _ddb(created_iso),
                                     ":un": _ddb(created_name),
                                 },
@@ -215,11 +211,9 @@ def create_one_ledger(payload: dict):
                     ]
                 )
             else:
-                # Transact:
-                # 1) Put initial state (must not exist)
-                # 2) Put ledger (unique pk)
+                # Create initial state
                 state_item_new = {
-                    "pk": state_key["pk"],
+                    "pk": state_pk,
                     "kind": "account_state",
                     "account_number": account_number,
                     "latest_balance": balance_after,
@@ -256,16 +250,76 @@ def create_one_ledger(payload: dict):
             }
 
         except ClientError as e:
-            code = (e.response or {}).get("Error", {}).get("Code", "")
-            if code in ("TransactionCanceledException", "ConditionalCheckFailedException"):
-                # race: state version changed, or state was created by another writer -> retry
-                continue
-            msg = (e.response or {}).get("Error", {}).get("Message", "")
-            return {"is_created": False, "message": f"DynamoDB error: {code}: {msg}".strip(), "ledger_id": ledger_id}
+            error_code = e.response.get("Error", {}).get("Code", "")
+            error_msg = e.response.get("Error", {}).get("Message", "")
+            
+            # Handle transaction conflicts - retry
+            if error_code == "TransactionCanceledException":
+                # Check cancellation reasons
+                cancellation_reasons = e.response.get("CancellationReasons", [])
+                
+                # Debug: print cancellation reasons
+                print(f"Attempt {attempt}: Cancellation reasons: {cancellation_reasons}")
+                
+                # If it's a version mismatch or state creation race, retry
+                should_retry = False
+                for reason in cancellation_reasons:
+                    reason_code = reason.get("Code", "")
+                    reason_msg = reason.get("Message", "")
+                    
+                    # ValidationError means schema/data type issue - don't retry
+                    if reason_code == "ValidationError":
+                        return {
+                            "is_created": False,
+                            "message": f"Validation error: {reason_msg}",
+                            "ledger_id": ledger_id
+                        }
+                    
+                    if reason_code in ("ConditionalCheckFailed", "ConditionalCheckFailedException"):
+                        should_retry = True
+                
+                if should_retry and attempt < max_attempts:
+                    # Exponential backoff
+                    time.sleep(0.05 * (2 ** (attempt - 1)))
+                    continue
+                else:
+                    return {
+                        "is_created": False,
+                        "message": f"Transaction failed: {error_msg}",
+                        "ledger_id": ledger_id
+                    }
+            
+            # Handle conditional check failures
+            elif error_code == "ConditionalCheckFailedException":
+                if attempt < max_attempts:
+                    time.sleep(0.05 * (2 ** (attempt - 1)))
+                    continue
+                else:
+                    return {
+                        "is_created": False,
+                        "message": "Conditional check failed after retries",
+                        "ledger_id": ledger_id
+                    }
+            
+            # Other DynamoDB errors - don't retry
+            return {
+                "is_created": False,
+                "message": f"DynamoDB error: {error_code}: {error_msg}",
+                "ledger_id": ledger_id
+            }
+            
         except Exception as e:
-            return {"is_created": False, "message": f"Unexpected error: {str(e)}", "ledger_id": ledger_id}
+            return {
+                "is_created": False,
+                "message": f"Unexpected error: {str(e)}",
+                "ledger_id": ledger_id
+            }
 
-    return {"is_created": False, "message": "conflict: too many concurrent updates, retry", "ledger_id": ledger_id}
+    return {
+        "is_created": False,
+        "message": "Max retry attempts exceeded due to concurrent updates",
+        "ledger_id": ledger_id
+    }
 
 
 if __name__ == "__main__":
