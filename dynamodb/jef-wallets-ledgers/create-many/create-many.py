@@ -21,23 +21,44 @@ def load_items(path):
 
 def validate_item(item):
     if not isinstance(item, dict):
-        raise ValueError("Item must be an object")
+        raise ValueError("Each item must be a dictionary/object")
 
+    # Required: pk must exist and be non-empty string (ledger_id)
     pk = item.get("pk")
-    sk = item.get("sk")
     if not isinstance(pk, str) or not pk.strip():
-        raise ValueError("Missing/invalid pk (must be non-empty string)")
-    if not isinstance(sk, str) or not sk.strip():
-        raise ValueError("Missing/invalid sk (must be non-empty string)")
+        raise ValueError("Missing or invalid 'pk' (must be non-empty string)")
 
-    # Optional: ensure number fields are Decimal-friendly
-    for k in ("balance_before", "amount", "balance_after"):
-        if k in item and item[k] is not None:
-            v = item[k]
-            if not isinstance(v, (int, float, Decimal, str)):
-                raise ValueError(f"Invalid {k} type: {type(v).__name__}")
-            if isinstance(v, str):
-                item[k] = Decimal(v)
+    # Strongly recommended: ledger_id should match pk
+    ledger_id = item.get("ledger_id")
+    if ledger_id is None:
+        item["ledger_id"] = pk
+    elif ledger_id != pk:
+        raise ValueError(f"'ledger_id' ({ledger_id}) does not match 'pk' ({pk})")
+
+    # Convert number fields to Decimal if they come as int/float/str
+    for key in ("balance_before", "amount", "balance_after"):
+        if key in item and item[key] is not None:
+            val = item[key]
+            if isinstance(val, (int, float)):
+                item[key] = Decimal(str(val))  # avoid float precision issues
+            elif isinstance(val, str):
+                try:
+                    item[key] = Decimal(val)
+                except:
+                    raise ValueError(f"Cannot convert {key} to Decimal: {val}")
+            elif not isinstance(val, Decimal):
+                raise ValueError(f"Invalid type for {key}: {type(val).__name__}")
+
+    # Optional: you can add more required field checks here
+    required_strings = [
+        "account_number", "type", "description", "date", "created"
+    ]
+    for field in required_strings:
+        if field not in item or not isinstance(item[field], str) or not item[field].strip():
+            raise ValueError(f"Missing or empty required field: {field}")
+
+    if item["type"] not in ("credit", "debit"):
+        raise ValueError("type must be 'credit' or 'debit'")
 
     return item
 
@@ -46,26 +67,43 @@ def upload_items(items):
     fail = 0
     errors = []
 
-    # Fix: batch_writer overwrite keys must match your table's *actual* key schema.
-    # If your table keys are (account_number, ledger_id), use those.
-    # If your table keys are (pk, sk), keep (pk, sk).
-    overwrite_keys = ["pk", "sk"]
+    # IMPORTANT: only "pk" is the primary key → no sort key
+    overwrite_keys = ["pk"]
 
     try:
         with table.batch_writer(overwrite_by_pkeys=overwrite_keys) as batch:
-            for i, item in enumerate(items):
+            for i, raw_item in enumerate(items):
                 try:
-                    item = validate_item(item)
-                    batch.put_item(Item=item)
+                    validated = validate_item(raw_item)
+                    batch.put_item(Item=validated)
                     ok += 1
                 except Exception as e:
                     fail += 1
                     errors.append({"index": i, "error": str(e)})
     except ClientError as e:
-        return {"uploaded": ok, "failed": fail + (len(items) - ok - fail), "errors": [{"error": str(e)}]}
+        # If the whole batch fails catastrophically
+        return {
+            "uploaded": ok,
+            "failed": len(items) - ok,
+            "errors": [{"batch_error": str(e)}]
+        }
 
-    return {"uploaded": ok, "failed": fail, "errors": errors[:20]}
+    return {
+        "uploaded": ok,
+        "failed": fail,
+        "errors": errors[:20]   # limit error list size in output
+    }
 
-items = load_items(FILE_PATH)
+# ────────────────────────────────────────────────
+# Run
+# ────────────────────────────────────────────────
+
+try:
+    items = load_items(FILE_PATH)
+    print(f"Loaded {len(items)} items from file")
+except Exception as e:
+    print(json.dumps({"error": f"Failed to load file: {str(e)}"}, indent=2))
+    exit(1)
+
 result = upload_items(items)
 print(json.dumps(result, indent=2, ensure_ascii=False, default=str))

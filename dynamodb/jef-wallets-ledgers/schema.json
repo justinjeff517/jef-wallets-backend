@@ -2,7 +2,8 @@
     "table":"jef-wallets-ledgers",
     "attributes":{
         "pk":"string",
-        "sk":"string",
+        "gsi_1_pk":"string",
+        "gsi_1_sk":"string", 
         "account_number":"string", 
         "sender_account_number":"string",
         "sender_account_name":"string",
@@ -21,8 +22,11 @@
         "balance_after":"number"
     }, 
     "main_index":{
-        "pk":"<account_number>",
-        "sk":"<ledger_id>"
+        "pk":"<ledger_id>"
+    },
+    "gsi_1":{
+        "gsi_1_pk":"<account_number>",
+        "gsi_1_sk":"<created>#<ledger_id>"
     }
 
 

@@ -16,16 +16,12 @@ _dynamodb = boto3.resource(
 )
 _table = _dynamodb.Table(TABLE_NAME)
 
-# If your table key schema is NOT (pk, sk), set these to match your real keys.
-# Example if keys are (account_number, ledger_id):
-#   PK_NAME = "account_number"
-#   SK_NAME = "ledger_id"
-PK_NAME = os.getenv("PK_NAME") or "pk"
-SK_NAME = os.getenv("SK_NAME") or "sk"
+# Your table uses only "pk" (ledger_id) — no sort key
+PK_NAME = "pk"
+SK_NAME = None  # important: set to None
 
-# Optional safety guard:
-# - If set, only delete items where attribute "account_number" equals this value.
-#   (prevents wiping the whole table by mistake)
+# Safety guard: only delete items where account_number matches this value
+# Leave empty ("") to allow deleting everything (dangerous!)
 DELETE_ACCOUNT_NUMBER = os.getenv("DELETE_ACCOUNT_NUMBER", "").strip()
 
 
@@ -34,53 +30,47 @@ def delete_all_ledgers():
     try:
         last_evaluated_key = None
 
-        # Build scan args
-        scan_kwargs = {"ProjectionExpression": f"{PK_NAME}, {SK_NAME}"}
+        scan_kwargs = {
+            "ProjectionExpression": PK_NAME  # only need pk for delete
+        }
 
-        # Optional filter (safe mode)
+        # Optional safety filter
         if DELETE_ACCOUNT_NUMBER:
-            # NOTE: FilterExpression attribute name is fixed here ("account_number").
-            # If you want it dynamic, make it an env too.
             scan_kwargs["FilterExpression"] = Attr("account_number").eq(DELETE_ACCOUNT_NUMBER)
 
         while True:
             if last_evaluated_key:
                 scan_kwargs["ExclusiveStartKey"] = last_evaluated_key
-            else:
-                scan_kwargs.pop("ExclusiveStartKey", None)
 
-            resp = _table.scan(**scan_kwargs)
-            items = resp.get("Items", []) or []
+            response = _table.scan(**scan_kwargs)
+            items = response.get("Items", [])
 
             if items:
                 with _table.batch_writer() as batch:
-                    for it in items:
-                        pk = it.get(PK_NAME)
-                        sk = it.get(SK_NAME)
-
-                        # If your table is single-key, SK_NAME might not exist; handle that.
-                        if pk is None:
+                    for item in items:
+                        pk_value = item.get(PK_NAME)
+                        if pk_value is None:
                             continue
 
-                        key = {PK_NAME: pk}
-                        if sk is not None and SK_NAME:
-                            key[SK_NAME] = sk
-
+                        key = {PK_NAME: pk_value}
                         batch.delete_item(Key=key)
                         deleted_count += 1
 
-            last_evaluated_key = resp.get("LastEvaluatedKey")
+            last_evaluated_key = response.get("LastEvaluatedKey")
             if not last_evaluated_key:
                 break
 
         if deleted_count == 0:
+            msg = "No ledgers found."
+            if DELETE_ACCOUNT_NUMBER:
+                msg += f" (filtered by account_number={DELETE_ACCOUNT_NUMBER})"
             return {
                 "is_deleted": False,
                 "deleted_count": 0,
-                "message": "No ledgers found to delete.",
+                "message": msg,
             }
 
-        scope = f" for account_number={DELETE_ACCOUNT_NUMBER}" if DELETE_ACCOUNT_NUMBER else ""
+        scope = f" for account_number={DELETE_ACCOUNT_NUMBER}" if DELETE_ACCOUNT_NUMBER else " (all items)"
         return {
             "is_deleted": True,
             "deleted_count": deleted_count,
@@ -98,7 +88,7 @@ def delete_all_ledgers():
         return {
             "is_deleted": False,
             "deleted_count": deleted_count,
-            "message": f"Error: {str(e)}",
+            "message": f"Unexpected error: {str(e)}",
         }
 
 

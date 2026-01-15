@@ -18,7 +18,9 @@
             "description":"string",
             "balance_before":"number",
             "amount":"number",
-            "balance_after":"number"
-        }
+            "balance_after":"number",
+            "elapsed_time":"string"
+        } 
+    
     ]
 }

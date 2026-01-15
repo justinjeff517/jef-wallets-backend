@@ -5,16 +5,19 @@
 
 # VARIABLES (easy find & replace)
 
-$PROJECT_DIR   = "H:\github12\jef-wallets-backend\lambda-ledgers\jef-wallets-get-all-ledgers-by-entity-number"
-$FUNCTION_NAME = "jef-wallets-get-all-ledgers-by-entity-number"
+$PROJECT_DIR   = "H:\github12\jef-wallets-backend\lambda-ledgers\jef-wallets-ledgers-get-all-by-account-number"
+$FUNCTION_NAME = "jef-wallets-ledgers-get-all-by-account-number"
 $DESCRIPTION   = "jef-wallets"
 $ROLE_ARN      = "arn:aws:iam::246715082475:role/role-one"
 $RUNTIME       = "python3.13"
 $HANDLER       = "lambda_function.lambda_handler"
 $REGION        = "ap-southeast-1"
-$RESERVED_CONCURRENCY = 5
 
-$LIBS = @("pymongo")   # add more libs in this array if needed
+$RESERVED_CONCURRENCY = 5
+$LIBS = @("ably","python-dotenv")
+
+
+# add more libs in this array if needed
 
 # Helper: join libs for pip
 function Join-Libs($libs) {
@@ -40,25 +43,20 @@ function Set-ReservedConcurrency {
 # CREATE FUNCTION WITH IMPORTED LIBS
 # ---------------------------------
 
-# 1) Go to your Lambda project folder
+
 Set-Location $PROJECT_DIR
 
-# 2) Rebuild a clean folder for the package
-if (Test-Path .\build) { Remove-Item .\build -Recurse -Force }
-New-Item -ItemType Directory -Path .\build | Out-Null
+if (Test-Path ".\build") { Remove-Item ".\build" -Recurse -Force }
+New-Item -ItemType Directory -Path ".\build" | Out-Null
 
-# 3) Install ALL needed libs into build/
-$libsJoined = Join-Libs $LIBS
-if ($libsJoined -ne "") {
-  pip install $libsJoined -t .\build
+if ($LIBS -and $LIBS.Count -gt 0) {
+  python -m pip install --upgrade @($LIBS) -t ".\build"
 }
 
-# 4) Copy your updated code into build/
-Copy-Item .\lambda_function.py .\build\
+Copy-Item ".\lambda_function.py" ".\build\" -Force
 
-# 5) Zip the CONTENTS of build/ into function.zip
-if (Test-Path .\function.zip) { Remove-Item .\function.zip -Force }
-Compress-Archive -Path .\build\* -DestinationPath .\function.zip -Force
+if (Test-Path ".\function.zip") { Remove-Item ".\function.zip" -Force }
+Compress-Archive -Path ".\build\*" -DestinationPath ".\function.zip" -Force
 
 aws lambda create-function `
   --function-name $FUNCTION_NAME `
@@ -67,6 +65,11 @@ aws lambda create-function `
   --role $ROLE_ARN `
   --handler $HANDLER `
   --zip-file fileb://function.zip `
+  --region $REGION
+
+aws lambda put-function-concurrency `
+  --function-name $FUNCTION_NAME `
+  --reserved-concurrent-executions $RESERVED_CONCURRENCY `
   --region $REGION
 
 Set-ReservedConcurrency -FunctionName $FUNCTION_NAME -Reserved $RESERVED_CONCURRENCY
@@ -124,29 +127,25 @@ Set-ReservedConcurrency -FunctionName $FUNCTION_NAME -Reserved $RESERVED_CONCURR
 # ---------------------------------
 # UPDATE FUNCTION WITH IMPORTED LIBS
 # ---------------------------------
-
 Set-Location $PROJECT_DIR
 
 if (Test-Path .\build) { Remove-Item .\build -Recurse -Force }
 New-Item -ItemType Directory -Path .\build | Out-Null
 
-# 3) Install ALL needed libs into build/
-$libsJoined = Join-Libs $LIBS
-if ($libsJoined -ne "") {
-  pip install $libsJoined -t .\build
+
+if ($LIBS -and $LIBS.Count -gt 0) {
+  python -m pip install --upgrade @($LIBS) -t .\build
 }
 
-# 4) Copy your updated code into build/
-Copy-Item .\lambda_function.py .\build\
 
-# 5) Zip the CONTENTS of build/ into function.zip
+Copy-Item .\lambda_function.py .\build\ -Force
+
+
 if (Test-Path .\function.zip) { Remove-Item .\function.zip -Force }
 Compress-Archive -Path .\build\* -DestinationPath .\function.zip -Force
 
-# 6) Upload (update) the existing Lambda function
+
 aws lambda update-function-code `
   --function-name $FUNCTION_NAME `
   --zip-file fileb://function.zip `
   --region $REGION
-
-Set-ReservedConcurrency -FunctionName $FUNCTION_NAME -Reserved $RESERVED_CONCURRENCY

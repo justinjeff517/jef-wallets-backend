@@ -1,7 +1,8 @@
 [
   {
-    "pk": "1001",
-    "sk": "8a7d4d3f-4c8c-4f51-9fd6-1d8b44c6f2a1",
+    "pk": "8a7d4d3f-4c8c-4f51-9fd6-1d8b44c6f2a1",
+    "gsi_1_pk": "1001",
+    "gsi_1_sk": "2026-01-02T09:05:12+08:00#8a7d4d3f-4c8c-4f51-9fd6-1d8b44c6f2a1",
     "account_number": "1001",
     "sender_account_number": "1002",
     "sender_account_name": "JEF Eggstore",
@@ -20,8 +21,9 @@
     "balance_after": 32800
   },
   {
-    "pk": "1002",
-    "sk": "f7d1b4f6-28e4-4f4f-8b9b-68b9a8a7c10a",
+    "pk": "f7d1b4f6-28e4-4f4f-8b9b-68b9a8a7c10a",
+    "gsi_1_pk": "1002",
+    "gsi_1_sk": "2026-01-02T09:05:13+08:00#f7d1b4f6-28e4-4f4f-8b9b-68b9a8a7c10a",
     "account_number": "1002",
     "sender_account_number": "1002",
     "sender_account_name": "JEF Eggstore",
@@ -40,8 +42,9 @@
     "balance_after": 10200
   },
   {
-    "pk": "1003",
-    "sk": "2d0a9b0a-0b6b-4db6-9d22-f02c41a2d7d6",
+    "pk": "2d0a9b0a-0b6b-4db6-9d22-f02c41a2d7d6",
+    "gsi_1_pk": "1003",
+    "gsi_1_sk": "2026-01-02T10:12:44+08:00#2d0a9b0a-0b6b-4db6-9d22-f02c41a2d7d6",
     "account_number": "1003",
     "sender_account_number": "1003",
     "sender_account_name": "JEF Sari-Sari Store",
@@ -60,8 +63,9 @@
     "balance_after": 10150
   },
   {
-    "pk": "1012",
-    "sk": "9fe14f7b-6e2d-4de6-8e5c-1a4a7b9f0c91",
+    "pk": "9fe14f7b-6e2d-4de6-8e5c-1a4a7b9f0c91",
+    "gsi_1_pk": "1012",
+    "gsi_1_sk": "2026-01-02T10:12:45+08:00#9fe14f7b-6e2d-4de6-8e5c-1a4a7b9f0c91",
     "account_number": "1012",
     "sender_account_number": "1003",
     "sender_account_name": "JEF Sari-Sari Store",
@@ -80,8 +84,9 @@
     "balance_after": 9850
   },
   {
-    "pk": "1004",
-    "sk": "c4e7e3c6-4b14-4f0a-9c1c-5a2a4dfe7b12",
+    "pk": "c4e7e3c6-4b14-4f0a-9c1c-5a2a4dfe7b12",
+    "gsi_1_pk": "1004",
+    "gsi_1_sk": "2026-01-02T11:03:20+08:00#c4e7e3c6-4b14-4f0a-9c1c-5a2a4dfe7b12",
     "account_number": "1004",
     "sender_account_number": "1004",
     "sender_account_name": "JEF Gas Refilling Station - Sikatuna",
@@ -100,8 +105,9 @@
     "balance_after": 15600
   },
   {
-    "pk": "1001",
-    "sk": "5a6e2a3d-2c59-4a5b-9c20-6c3d6e9a2fdd",
+    "pk": "5a6e2a3d-2c59-4a5b-9c20-6c3d6e9a2fdd",
+    "gsi_1_pk": "1001",
+    "gsi_1_sk": "2026-01-02T11:03:21+08:00#5a6e2a3d-2c59-4a5b-9c20-6c3d6e9a2fdd",
     "account_number": "1001",
     "sender_account_number": "1004",
     "sender_account_name": "JEF Gas Refilling Station - Sikatuna",
@@ -120,8 +126,9 @@
     "balance_after": 39200
   },
   {
-    "pk": "1005",
-    "sk": "e95f1d2a-4f3a-4a42-9e8b-0a3b0d1c7d44",
+    "pk": "e95f1d2a-4f3a-4a42-9e8b-0a3b0d1c7d44",
+    "gsi_1_pk": "1005",
+    "gsi_1_sk": "2026-01-02T15:26:05+08:00#e95f1d2a-4f3a-4a42-9e8b-0a3b0d1c7d44",
     "account_number": "1005",
     "sender_account_number": "1005",
     "sender_account_name": "JEF Gas Refilling Station - Loboc",
@@ -140,8 +147,9 @@
     "balance_after": 10800
   },
   {
-    "pk": "1001",
-    "sk": "d0d4e8d5-6d09-4cf6-88e6-6f0a8f73f3c3",
+    "pk": "d0d4e8d5-6d09-4cf6-88e6-6f0a8f73f3c3",
+    "gsi_1_pk": "1001",
+    "gsi_1_sk": "2026-01-02T15:26:06+08:00#d0d4e8d5-6d09-4cf6-88e6-6f0a8f73f3c3",
     "account_number": "1001",
     "sender_account_number": "1005",
     "sender_account_name": "JEF Gas Refilling Station - Loboc",
@@ -160,8 +168,9 @@
     "balance_after": 44400
   },
   {
-    "pk": "1001",
-    "sk": "1f8c2c6a-2b7b-4f1e-8b63-3bb7b4c2a8c1",
+    "pk": "1f8c2c6a-2b7b-4f1e-8b63-3bb7b4c2a8c1",
+    "gsi_1_pk": "1001",
+    "gsi_1_sk": "2026-01-03T07:10:02+08:00#1f8c2c6a-2b7b-4f1e-8b63-3bb7b4c2a8c1",
     "account_number": "1001",
     "sender_account_number": "1001",
     "sender_account_name": "Ellorimo Farm",
@@ -180,8 +189,9 @@
     "balance_after": 32400
   },
   {
-    "pk": "1013",
-    "sk": "b6a5f2f2-9a2a-4f51-b6d9-8c1f1c0b2f7d",
+    "pk": "b6a5f2f2-9a2a-4f51-b6d9-8c1f1c0b2f7d",
+    "gsi_1_pk": "1013",
+    "gsi_1_sk": "2026-01-03T07:10:03+08:00#b6a5f2f2-9a2a-4f51-b6d9-8c1f1c0b2f7d",
     "account_number": "1013",
     "sender_account_number": "1001",
     "sender_account_name": "Ellorimo Farm",
@@ -200,8 +210,9 @@
     "balance_after": 17000
   },
   {
-    "pk": "1013",
-    "sk": "a2a2c9b9-6c5a-4c8f-9b33-7d9e2e3a9f11",
+    "pk": "a2a2c9b9-6c5a-4c8f-9b33-7d9e2e3a9f11",
+    "gsi_1_pk": "1013",
+    "gsi_1_sk": "2026-01-03T09:22:30+08:00#a2a2c9b9-6c5a-4c8f-9b33-7d9e2e3a9f11",
     "account_number": "1013",
     "sender_account_number": "1013",
     "sender_account_name": "Layer Building 1A",
@@ -220,8 +231,9 @@
     "balance_after": 16080
   },
   {
-    "pk": "1006",
-    "sk": "0f2c1e9a-2d2c-4a2f-b0a4-b9a8c9d4f2b1",
+    "pk": "0f2c1e9a-2d2c-4a2f-b0a4-b9a8c9d4f2b1",
+    "gsi_1_pk": "1006",
+    "gsi_1_sk": "2026-01-03T09:22:31+08:00#0f2c1e9a-2d2c-4a2f-b0a4-b9a8c9d4f2b1",
     "account_number": "1006",
     "sender_account_number": "1013",
     "sender_account_name": "Layer Building 1A",
@@ -240,8 +252,9 @@
     "balance_after": 15920
   },
   {
-    "pk": "1006",
-    "sk": "d5a1e2b3-7f3d-4b8a-8c3e-7a1b2c3d4e5f",
+    "pk": "d5a1e2b3-7f3d-4b8a-8c3e-7a1b2c3d4e5f",
+    "gsi_1_pk": "1006",
+    "gsi_1_sk": "2026-01-03T17:40:10+08:00#d5a1e2b3-7f3d-4b8a-8c3e-7a1b2c3d4e5f",
     "account_number": "1006",
     "sender_account_number": "1006",
     "sender_account_name": "JEF Minimart",
@@ -260,8 +273,9 @@
     "balance_after": 11620
   },
   {
-    "pk": "1001",
-    "sk": "6c3b2a1d-9f12-4b6a-8e2a-1b2c3d4e5f6a",
+    "pk": "6c3b2a1d-9f12-4b6a-8e2a-1b2c3d4e5f6a",
+    "gsi_1_pk": "1001",
+    "gsi_1_sk": "2026-01-03T17:40:11+08:00#6c3b2a1d-9f12-4b6a-8e2a-1b2c3d4e5f6a",
     "account_number": "1001",
     "sender_account_number": "1006",
     "sender_account_name": "JEF Minimart",
@@ -280,8 +294,9 @@
     "balance_after": 36700
   },
   {
-    "pk": "1001",
-    "sk": "3b5f1b2a-1d2c-4e5f-9a8b-7c6d5e4f3a2b",
+    "pk": "3b5f1b2a-1d2c-4e5f-9a8b-7c6d5e4f3a2b",
+    "gsi_1_pk": "1001",
+    "gsi_1_sk": "2026-01-04T08:15:00+08:00#3b5f1b2a-1d2c-4e5f-9a8b-7c6d5e4f3a2b",
     "account_number": "1001",
     "sender_account_number": "1001",
     "sender_account_name": "Ellorimo Farm",
@@ -300,8 +315,9 @@
     "balance_after": 30700
   },
   {
-    "pk": "1014",
-    "sk": "7a8b9c0d-1e2f-4a3b-8c9d-0e1f2a3b4c5d",
+    "pk": "7a8b9c0d-1e2f-4a3b-8c9d-0e1f2a3b4c5d",
+    "gsi_1_pk": "1014",
+    "gsi_1_sk": "2026-01-04T08:15:01+08:00#7a8b9c0d-1e2f-4a3b-8c9d-0e1f2a3b4c5d",
     "account_number": "1014",
     "sender_account_number": "1001",
     "sender_account_name": "Ellorimo Farm",
@@ -320,8 +336,9 @@
     "balance_after": 10200
   },
   {
-    "pk": "1014",
-    "sk": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+    "pk": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+    "gsi_1_pk": "1014",
+    "gsi_1_sk": "2026-01-04T10:05:18+08:00#c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
     "account_number": "1014",
     "sender_account_number": "1014",
     "sender_account_name": "Layer Building 1B",
@@ -340,8 +357,9 @@
     "balance_after": 8725
   },
   {
-    "pk": "1012",
-    "sk": "6e7f8a9b-0c1d-4e2f-8a9b-0c1d2e3f4a5b",
+    "pk": "6e7f8a9b-0c1d-4e2f-8a9b-0c1d2e3f4a5b",
+    "gsi_1_pk": "1012",
+    "gsi_1_sk": "2026-01-04T10:05:19+08:00#6e7f8a9b-0c1d-4e2f-8a9b-0c1d2e3f4a5b",
     "account_number": "1012",
     "sender_account_number": "1014",
     "sender_account_name": "Layer Building 1B",
@@ -360,8 +378,9 @@
     "balance_after": 11325
   },
   {
-    "pk": "1008",
-    "sk": "a9b8c7d6-e5f4-4a3b-8c9d-1e2f3a4b5c6d",
+    "pk": "a9b8c7d6-e5f4-4a3b-8c9d-1e2f3a4b5c6d",
+    "gsi_1_pk": "1008",
+    "gsi_1_sk": "2026-01-04T18:05:40+08:00#a9b8c7d6-e5f4-4a3b-8c9d-1e2f3a4b5c6d",
     "account_number": "1008",
     "sender_account_number": "1008",
     "sender_account_name": "JEF Sari-Sari Store - Food Terminal",
@@ -380,8 +399,9 @@
     "balance_after": 10500
   },
   {
-    "pk": "1001",
-    "sk": "0a1b2c3d-4e5f-4a6b-8c9d-1e2f3a4b5c6e",
+    "pk": "0a1b2c3d-4e5f-4a6b-8c9d-1e2f3a4b5c6e",
+    "gsi_1_pk": "1001",
+    "gsi_1_sk": "2026-01-04T18:05:41+08:00#0a1b2c3d-4e5f-4a6b-8c9d-1e2f3a4b5c6e",
     "account_number": "1001",
     "sender_account_number": "1008",
     "sender_account_name": "JEF Sari-Sari Store - Food Terminal",
@@ -400,8 +420,9 @@
     "balance_after": 34200
   },
   {
-    "pk": "1001",
-    "sk": "4d3c2b1a-0f9e-4d8c-8b7a-6e5d4c3b2a19",
+    "pk": "4d3c2b1a-0f9e-4d8c-8b7a-6e5d4c3b2a19",
+    "gsi_1_pk": "1001",
+    "gsi_1_sk": "2026-01-05T08:30:00+08:00#4d3c2b1a-0f9e-4d8c-8b7a-6e5d4c3b2a19",
     "account_number": "1001",
     "sender_account_number": "1001",
     "sender_account_name": "Ellorimo Farm",
@@ -420,8 +441,9 @@
     "balance_after": 29200
   },
   {
-    "pk": "1009",
-    "sk": "3e2d1c0b-9a8f-4e7d-8c6b-5a4f3e2d1c0b",
+    "pk": "3e2d1c0b-9a8f-4e7d-8c6b-5a4f3e2d1c0b",
+    "gsi_1_pk": "1009",
+    "gsi_1_sk": "2026-01-05T08:30:01+08:00#3e2d1c0b-9a8f-4e7d-8c6b-5a4f3e2d1c0b",
     "account_number": "1009",
     "sender_account_number": "1001",
     "sender_account_name": "Ellorimo Farm",
@@ -440,8 +462,9 @@
     "balance_after": 11000
   },
   {
-    "pk": "1009",
-    "sk": "7b6a5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5e",
+    "pk": "7b6a5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5e",
+    "gsi_1_pk": "1009",
+    "gsi_1_sk": "2026-01-05T10:05:12+08:00#7b6a5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5e",
     "account_number": "1009",
     "sender_account_number": "1009",
     "sender_account_name": "Caferimo Coffee Shop - Dao",
@@ -460,8 +483,9 @@
     "balance_after": 10320
   },
   {
-    "pk": "1006",
-    "sk": "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5f",
+    "pk": "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5f",
+    "gsi_1_pk": "1006",
+    "gsi_1_sk": "2026-01-05T10:05:13+08:00#1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5f",
     "account_number": "1006",
     "sender_account_number": "1009",
     "sender_account_name": "Caferimo Coffee Shop - Dao",
@@ -480,8 +504,9 @@
     "balance_after": 12300
   },
   {
-    "pk": "1010",
-    "sk": "9c8b7a6e-5d4c-4b3a-8c9d-1e2f3a4b5c6f",
+    "pk": "9c8b7a6e-5d4c-4b3a-8c9d-1e2f3a4b5c6f",
+    "gsi_1_pk": "1010",
+    "gsi_1_sk": "2026-01-05T18:22:10+08:00#9c8b7a6e-5d4c-4b3a-8c9d-1e2f3a4b5c6f",
     "account_number": "1010",
     "sender_account_number": "1010",
     "sender_account_name": "Caferimo Coffee Shop - Loboc",
@@ -500,8 +525,9 @@
     "balance_after": 7400
   },
   {
-    "pk": "1001",
-    "sk": "2f3a4b5c-6d7e-4f8a-9b0c-1d2e3f4a5b6c",
+    "pk": "2f3a4b5c-6d7e-4f8a-9b0c-1d2e3f4a5b6c",
+    "gsi_1_pk": "1001",
+    "gsi_1_sk": "2026-01-05T18:22:11+08:00#2f3a4b5c-6d7e-4f8a-9b0c-1d2e3f4a5b6c",
     "account_number": "1001",
     "sender_account_number": "1010",
     "sender_account_name": "Caferimo Coffee Shop - Loboc",
@@ -520,8 +546,9 @@
     "balance_after": 31300
   },
   {
-    "pk": "1007",
-    "sk": "6b5a4f3e-2d1c-4b0a-9f8e-7d6c5b4a3f2e",
+    "pk": "6b5a4f3e-2d1c-4b0a-9f8e-7d6c5b4a3f2e",
+    "gsi_1_pk": "1007",
+    "gsi_1_sk": "2026-01-06T17:55:00+08:00#6b5a4f3e-2d1c-4b0a-9f8e-7d6c5b4a3f2e",
     "account_number": "1007",
     "sender_account_number": "1007",
     "sender_account_name": "JEF Outlets - Dao",
@@ -540,8 +567,9 @@
     "balance_after": 13100
   },
   {
-    "pk": "1001",
-    "sk": "8c7d6e5f-4a3b-4c2d-9e0f-1a2b3c4d5e6f",
+    "pk": "8c7d6e5f-4a3b-4c2d-9e0f-1a2b3c4d5e6f",
+    "gsi_1_pk": "1001",
+    "gsi_1_sk": "2026-01-06T17:55:01+08:00#8c7d6e5f-4a3b-4c2d-9e0f-1a2b3c4d5e6f",
     "account_number": "1001",
     "sender_account_number": "1007",
     "sender_account_name": "JEF Outlets - Dao",
@@ -560,8 +588,9 @@
     "balance_after": 35200
   },
   {
-    "pk": "1001",
-    "sk": "0d1c2b3a-4f5e-4d6c-8b7a-9f0e1d2c3b4a",
+    "pk": "0d1c2b3a-4f5e-4d6c-8b7a-9f0e1d2c3b4a",
+    "gsi_1_pk": "1001",
+    "gsi_1_sk": "2026-01-07T08:05:00+08:00#0d1c2b3a-4f5e-4d6c-8b7a-9f0e1d2c3b4a",
     "account_number": "1001",
     "sender_account_number": "1001",
     "sender_account_name": "Ellorimo Farm",
@@ -580,8 +609,9 @@
     "balance_after": 27200
   },
   {
-    "pk": "1015",
-    "sk": "5e4d3c2b-1a0f-4e9d-8c7b-6a5f4e3d2c1b",
+    "pk": "5e4d3c2b-1a0f-4e9d-8c7b-6a5f4e3d2c1b",
+    "gsi_1_pk": "1015",
+    "gsi_1_sk": "2026-01-07T08:05:01+08:00#5e4d3c2b-1a0f-4e9d-8c7b-6a5f4e3d2c1b",
     "account_number": "1015",
     "sender_account_number": "1001",
     "sender_account_name": "Ellorimo Farm",
@@ -600,8 +630,9 @@
     "balance_after": 11000
   },
   {
-    "pk": "1015",
-    "sk": "aa12bb34-cc56-4d78-9e90-ff12aa34bb56",
+    "pk": "aa12bb34-cc56-4d78-9e90-ff12aa34bb56",
+    "gsi_1_pk": "1015",
+    "gsi_1_sk": "2026-01-07T10:40:22+08:00#aa12bb34-cc56-4d78-9e90-ff12aa34bb56",
     "account_number": "1015",
     "sender_account_number": "1015",
     "sender_account_name": "Layer Building 2A",
@@ -620,8 +651,9 @@
     "balance_after": 9740
   },
   {
-    "pk": "1012",
-    "sk": "bb56aa34-ff12-4d78-9e90-cc56aa12bb34",
+    "pk": "bb56aa34-ff12-4d78-9e90-cc56aa12bb34",
+    "gsi_1_pk": "1012",
+    "gsi_1_sk": "2026-01-07T10:40:23+08:00#bb56aa34-ff12-4d78-9e90-cc56aa12bb34",
     "account_number": "1012",
     "sender_account_number": "1015",
     "sender_account_name": "Layer Building 2A",

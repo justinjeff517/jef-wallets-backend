@@ -5,16 +5,16 @@
 
 # VARIABLES (easy find & replace)
 
-$PROJECT_DIR   = "H:\github16\jef-chat-backend\lambda-messages\jef-chat-messages-ably-trigger-by-thread-id"
-$FUNCTION_NAME = "jef-chat-messages-ably-trigger-by-thread-id"
+$PROJECT_DIR   = "H:\github16\jef-chat-backend\lambda-messages\jef-chat-messages-create-one-to-thread"
+$FUNCTION_NAME = "jef-chat-messages-create-one-to-thread"
 $DESCRIPTION   = "jef-wallets"
 $ROLE_ARN      = "arn:aws:iam::246715082475:role/role-one"
 $RUNTIME       = "python3.13"
 $HANDLER       = "lambda_function.lambda_handler"
 $REGION        = "ap-southeast-1"
 $RESERVED_CONCURRENCY = 5
+$LIBS = @("ably","python-dotenv")
 
-$LIBS = @("ably","second_lib")   
 
 # add more libs in this array if needed
 
@@ -45,24 +45,32 @@ function Set-ReservedConcurrency {
 
 Set-Location $PROJECT_DIR
 
-Remove-Item .\build -Recurse -Force -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Path .\build | Out-Null
+if (Test-Path ".\build") { Remove-Item ".\build" -Recurse -Force }
+New-Item -ItemType Directory -Path ".\build" | Out-Null
 
-pip install ably -t .\build
-Copy-Item .\lambda_function.py .\build\ -Force
+if ($LIBS -and $LIBS.Count -gt 0) {
+  python -m pip install --upgrade @($LIBS) -t ".\build"
+}
 
-Remove-Item .\function.zip -Force -ErrorAction SilentlyContinue
-Compress-Archive -Path .\build\* -DestinationPath .\function.zip -Force
+Copy-Item ".\lambda_function.py" ".\build\" -Force
+
+if (Test-Path ".\function.zip") { Remove-Item ".\function.zip" -Force }
+Compress-Archive -Path ".\build\*" -DestinationPath ".\function.zip" -Force
 
 aws lambda create-function `
   --function-name $FUNCTION_NAME `
+  --description "$DESCRIPTION" `
   --runtime $RUNTIME `
   --role $ROLE_ARN `
   --handler $HANDLER `
   --zip-file fileb://function.zip `
   --region $REGION
 
-  
+aws lambda put-function-concurrency `
+  --function-name $FUNCTION_NAME `
+  --reserved-concurrent-executions $RESERVED_CONCURRENCY `
+  --region $REGION
+
 Set-ReservedConcurrency -FunctionName $FUNCTION_NAME -Reserved $RESERVED_CONCURRENCY
 
 

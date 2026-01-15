@@ -1,9 +1,0 @@
-{
-    "exists":"boolean",
-    "message":"string", 
-    "entity_number":"string",
-    "latest_ledger_date":"string", 
-    "latest_ledger_date_name":"string", 
-    "latest_balance_amount":"number"
-
-}
