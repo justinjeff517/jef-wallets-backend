@@ -50,21 +50,26 @@ def validate_item(item):
     if not isinstance(item, dict):
         raise ValueError("Each item must be an object/dict")
 
+    # ledger_id is the primary identifier (pk must equal ledger_id)
+    ledger_id = _as_str(item.get("ledger_id"))
     pk = _as_str(item.get("pk"))
-    if not pk:
-        raise ValueError("Missing/invalid pk")
 
-    ledger_id = item.get("ledger_id")
-    if ledger_id is None:
-        item["ledger_id"] = pk
-    else:
-        ledger_id = _as_str(ledger_id)
-        if not ledger_id:
-            raise ValueError("Missing/invalid ledger_id")
-        if ledger_id != pk:
-            raise ValueError("ledger_id must match pk")
+    if not ledger_id and not pk:
+        raise ValueError("Missing/invalid ledger_id (or pk)")
+
+    if not ledger_id:
+        ledger_id = pk
+        item["ledger_id"] = ledger_id
+
+    if pk and pk != ledger_id:
+        raise ValueError("pk must match ledger_id")
+
+    # enforce pk = ledger_id
+    item["pk"] = ledger_id
 
     required_str = (
+        "transaction_id",
+        "creator_account_number",
         "sender_account_number",
         "sender_account_name",
         "receiver_account_number",
@@ -81,35 +86,32 @@ def validate_item(item):
         if not _as_str(item.get(k)):
             raise ValueError(f"Missing/empty {k}")
 
-    if item["type"] not in ("credit", "debit"):
+    typ = _as_str(item.get("type"))
+    if typ not in ("credit", "debit"):
         raise ValueError("type must be credit|debit")
 
-    item["amount"] = _to_decimal(item.get("amount"))
-    if item["amount"] is None:
+    amt = _to_decimal(item.get("amount"))
+    if amt is None:
         raise ValueError("Missing/invalid amount")
+    item["amount"] = amt
 
-    # New schema:
-    # gsi_1_pk = sender_account_number
-    # gsi_2_pk = receiver_account_number
-    # *_sk = created#ledger_id
     sender_acct = _as_str(item.get("sender_account_number"))
     receiver_acct = _as_str(item.get("receiver_account_number"))
     created = _as_str(item.get("created"))
-    lid = _as_str(item.get("ledger_id"))
+    txid = _as_str(item.get("transaction_id"))
 
+    # GSIs
     item["gsi_1_pk"] = sender_acct
-    item["gsi_1_sk"] = f"{created}#{lid}"
+    item["gsi_1_sk"] = f"{created}#{ledger_id}"
 
     item["gsi_2_pk"] = receiver_acct
-    item["gsi_2_sk"] = f"{created}#{lid}"
+    item["gsi_2_sk"] = f"{created}#{ledger_id}"
 
-    # account_number is no longer used as an index source in your new schema.
-    # Keep it if present, but don't require it.
-    if "account_number" in item and not _as_str(item.get("account_number")):
-        item.pop("account_number", None)
+    item["gsi_3_pk"] = txid
+    item["gsi_3_sk"] = typ
 
-    # Drop old fields if present
-    for k in ("balance_before", "balance_after"):
+    # drop any legacy/unwanted fields if present
+    for k in ("balance_before", "balance_after", "account_number"):
         if k in item:
             item.pop(k, None)
 
@@ -144,9 +146,12 @@ def put_with_wcu_limit(items):
             used += need
             ok += 1
 
+        except ClientError as e:
+            fail += 1
+            errors.append({"index": i, "error": str(e), "code": "ClientError"})
         except Exception as e:
             fail += 1
-            errors.append({"index": i, "error": str(e)})
+            errors.append({"index": i, "error": str(e), "code": "Exception"})
 
     return {"uploaded": ok, "failed": fail, "errors": errors[:20], "wcu_per_sec": WCU_PER_SEC}
 

@@ -1,12 +1,12 @@
 import os
-import json
+from uuid import uuid4
 from decimal import Decimal, InvalidOperation
 from datetime import datetime, timezone, timedelta
-import time
 
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from boto3.dynamodb.types import TypeSerializer
 
 # ----------------------------
 # CONFIG
@@ -14,14 +14,18 @@ from botocore.exceptions import ClientError
 AWS_REGION = (os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "ap-southeast-1").strip()
 TABLE_NAME = (os.getenv("WALLETS_LEDGERS_TABLE") or "jef-wallets-ledgers").strip()
 
+# DynamoDB GSI names (set these env vars if your actual index names differ)
+GSI3_NAME = (os.getenv("WALLETS_LEDGERS_GSI3_NAME") or "gsi_3").strip()
+
 _TZ_MANILA = timezone(timedelta(hours=8))
 
-ddb = boto3.resource(
+ddb = boto3.client(
     "dynamodb",
     region_name=AWS_REGION,
     config=Config(retries={"max_attempts": 10, "mode": "standard"}),
 )
-table = ddb.Table(TABLE_NAME)
+
+_ser = TypeSerializer()
 
 # ----------------------------
 # HELPERS
@@ -34,10 +38,11 @@ def _to_decimal(v):
         return None
     if isinstance(v, Decimal):
         return v
-    if isinstance(v, bool):
-        return None
     if isinstance(v, (int, float)):
-        return Decimal(str(v))
+        try:
+            return Decimal(str(v))
+        except Exception:
+            return None
     if isinstance(v, str):
         s = v.strip()
         if not s:
@@ -49,149 +54,198 @@ def _to_decimal(v):
     return None
 
 def _fmt_date_name(dt):
-    day = dt.day
-    return f"{dt.strftime('%B')}, {day}, {dt.year}, {dt.strftime('%A')}"
+    return f"{dt.strftime('%B')} {dt.day}, {dt.year}, {dt.strftime('%A')}"
 
 def _fmt_created_name(dt):
-    day = dt.day
-    time_str = dt.strftime("%I:%M %p").lstrip("0")
-    return f"{dt.strftime('%B')}, {day}, {dt.year}, {dt.strftime('%A')}, {time_str}"
+    hour12 = dt.strftime("%I").lstrip("0") or "12"
+    minute = dt.strftime("%M")
+    ampm = dt.strftime("%p")
+    return f"{dt.strftime('%B')} {dt.day}, {dt.year}, {dt.strftime('%A')}, {hour12}:{minute} {ampm}"
+
+def _serialize_item(py_item):
+    clean = {k: v for k, v in py_item.items() if v is not None}
+    return {k: _ser.serialize(v) for k, v in clean.items()}
+
+def _transaction_exists(transaction_id):
+    # Query GSI_3 by transaction_id (partition key)
+    try:
+        resp = ddb.query(
+            TableName=TABLE_NAME,
+            IndexName=GSI3_NAME,
+            KeyConditionExpression="#p = :p",
+            ExpressionAttributeNames={"#p": "gsi_3_pk"},
+            ExpressionAttributeValues={":p": {"S": transaction_id}},
+            ProjectionExpression="pk",
+            Limit=1,
+        )
+        return (resp.get("Count") or 0) > 0
+    except ClientError:
+        # If index name is wrong or access denied, treat as "unknown" and allow create
+        return False
 
 # ----------------------------
 # MAIN
 # ----------------------------
-def create_one_ledger(payload: dict):
+def create_double_entry(payload, enforce_unique_transaction=True):
     """
-    New schema (no balances, no STATE item):
-      pk         = <ledger_id>
-      gsi_1_pk    = <account_number>
-      gsi_1_sk    = <created>#<ledger_id>
+    payload format:
+    {
+      "creator_account_number": "string",
+      "sender_account_number": "string",
+      "sender_account_name": "string",
+      "receiver_account_number": "string",
+      "receiver_account_name": "string",
+      "description": "string",
+      "amount": "number",
+      "created_by": "string",
+      "transaction_id": "string-uuidv4"
+    }
+
+    response format:
+    {
+      "is_created": bool,
+      "message": str,
+      "ledger_id": str
+    }
     """
-    p = payload or {}
+    creator_account_number = _as_str(payload.get("creator_account_number"))
+    sender_account_number = _as_str(payload.get("sender_account_number"))
+    sender_account_name = _as_str(payload.get("sender_account_name"))
+    receiver_account_number = _as_str(payload.get("receiver_account_number"))
+    receiver_account_name = _as_str(payload.get("receiver_account_name"))
+    description = _as_str(payload.get("description"))
+    created_by = _as_str(payload.get("created_by"))
+    transaction_id = _as_str(payload.get("transaction_id"))
+    amount = _to_decimal(payload.get("amount"))
 
-    account_number = _as_str(p.get("account_number"))
-    sender_account_number = _as_str(p.get("sender_account_number"))
-    sender_account_name = _as_str(p.get("sender_account_name"))
-    receiver_account_number = _as_str(p.get("receiver_account_number"))
-    receiver_account_name = _as_str(p.get("receiver_account_name"))
-    typ = _as_str(p.get("type")).lower()
-    description = _as_str(p.get("description"))
-    created_by = _as_str(p.get("created_by"))
-    ledger_id = _as_str(p.get("ledger_id"))
-    amount = _to_decimal(p.get("amount"))
+    if not creator_account_number:
+        return {"is_created": False, "message": "Missing creator_account_number", "ledger_id": ""}
 
-    if not account_number:
-        return {"is_created": False, "message": "account_number is required", "ledger_id": ""}
+    if not sender_account_number:
+        return {"is_created": False, "message": "Missing sender_account_number", "ledger_id": ""}
 
-    if not ledger_id:
-        return {"is_created": False, "message": "ledger_id is required", "ledger_id": ""}
+    if not receiver_account_number:
+        return {"is_created": False, "message": "Missing receiver_account_number", "ledger_id": ""}
 
-    if typ not in ("credit", "debit"):
-        return {"is_created": False, "message": "type must be 'credit' or 'debit'", "ledger_id": ledger_id}
+    if not transaction_id:
+        return {"is_created": False, "message": "Missing transaction_id", "ledger_id": ""}
 
     if amount is None or amount <= 0:
-        return {"is_created": False, "message": "amount must be a positive number", "ledger_id": ledger_id}
+        return {"is_created": False, "message": "Invalid amount (must be > 0)", "ledger_id": ""}
 
-    # enforce: account_number == sender_account_number (your stated rule)
-    if sender_account_number and sender_account_number != account_number:
-        return {"is_created": False, "message": "account_number must match sender_account_number", "ledger_id": ledger_id}
-    if not sender_account_number:
-        sender_account_number = account_number
+    # Your rule: debit item only if creator_account_number is sender_account_number
+    if creator_account_number != sender_account_number:
+        return {
+            "is_created": False,
+            "message": "Rejected: creator_account_number must equal sender_account_number for debit creation",
+            "ledger_id": "",
+        }
+
+    if created_by and not (len(created_by) == 5 and created_by.isdigit()):
+        return {"is_created": False, "message": "Invalid created_by (must be 5 digits)", "ledger_id": ""}
+
+    if enforce_unique_transaction and _transaction_exists(transaction_id):
+        return {"is_created": False, "message": "Transaction already exists (transaction_id)", "ledger_id": ""}
 
     now = datetime.now(_TZ_MANILA)
-    created_iso = now.isoformat(timespec="seconds")
-    date_str = now.strftime("%Y-%m-%d")
+    created = now.isoformat(timespec="seconds")
+    date = now.date().isoformat()
     date_name = _fmt_date_name(now)
     created_name = _fmt_created_name(now)
 
-    ledger_item = {
-        "pk": ledger_id,
-        "gsi_1_pk": account_number,
-        "gsi_1_sk": f"{created_iso}#{ledger_id}",
-        "account_number": account_number,
+    debit_ledger_id = str(uuid4())
+    credit_ledger_id = str(uuid4())
+
+    # Debit item (indexed for sender via GSI_1)
+    debit_item = {
+        "pk": debit_ledger_id,
+        "ledger_id": debit_ledger_id,
+        "transaction_id": transaction_id,
+        "gsi_3_pk": transaction_id,
+        "gsi_3_sk": "debit",
+        "gsi_1_pk": sender_account_number,
+        "gsi_1_sk": f"{created}#{debit_ledger_id}",
+        "creator_account_number": creator_account_number,
         "sender_account_number": sender_account_number,
         "sender_account_name": sender_account_name,
         "receiver_account_number": receiver_account_number,
         "receiver_account_name": receiver_account_name,
-        "ledger_id": ledger_id,
-        "date": date_str,
+        "date": date,
         "date_name": date_name,
-        "created": created_iso,
+        "created": created,
         "created_name": created_name,
         "created_by": created_by,
-        "type": typ,
+        "type": "debit",
         "description": description,
         "amount": amount,
     }
 
-    max_attempts = 5
-    for attempt in range(1, max_attempts + 1):
-        try:
-            table.put_item(
-                Item=ledger_item,
-                ConditionExpression="attribute_not_exists(pk)",
-            )
-
-            return {
-                "is_created": True,
-                "message": "Created",
-                "ledger_id": ledger_id,
-            }
-
-        except ClientError as e:
-            code = e.response.get("Error", {}).get("Code", "")
-            msg = e.response.get("Error", {}).get("Message", "")
-
-            if code == "ConditionalCheckFailedException":
-                return {
-                    "is_created": False,
-                    "message": "ledger_id already exists",
-                    "ledger_id": ledger_id,
-                }
-
-            if code in ("ProvisionedThroughputExceededException", "ThrottlingException", "RequestLimitExceeded"):
-                if attempt < max_attempts:
-                    time.sleep(0.05 * (2 ** (attempt - 1)))
-                    continue
-                return {
-                    "is_created": False,
-                    "message": f"Throttled: {code}: {msg}",
-                    "ledger_id": ledger_id,
-                }
-
-            return {
-                "is_created": False,
-                "message": f"DynamoDB error: {code}: {msg}",
-                "ledger_id": ledger_id,
-            }
-
-        except Exception as e:
-            return {
-                "is_created": False,
-                "message": f"Unexpected error: {str(e)}",
-                "ledger_id": ledger_id,
-            }
-
-    return {
-        "is_created": False,
-        "message": "Max retry attempts exceeded",
-        "ledger_id": ledger_id,
+    # Credit item (indexed for receiver via GSI_2)
+    credit_item = {
+        "pk": credit_ledger_id,
+        "ledger_id": credit_ledger_id,
+        "transaction_id": transaction_id,
+        "gsi_3_pk": transaction_id,
+        "gsi_3_sk": "credit",
+        "gsi_2_pk": receiver_account_number,
+        "gsi_2_sk": f"{created}#{credit_ledger_id}",
+        "creator_account_number": creator_account_number,
+        "sender_account_number": sender_account_number,
+        "sender_account_name": sender_account_name,
+        "receiver_account_number": receiver_account_number,
+        "receiver_account_name": receiver_account_name,
+        "date": date,
+        "date_name": date_name,
+        "created": created,
+        "created_name": created_name,
+        "created_by": created_by,
+        "type": "credit",
+        "description": description,
+        "amount": amount,
     }
 
+    try:
+        ddb.transact_write_items(
+            TransactItems=[
+                {
+                    "Put": {
+                        "TableName": TABLE_NAME,
+                        "Item": _serialize_item(debit_item),
+                        "ConditionExpression": "attribute_not_exists(pk)",
+                    }
+                },
+                {
+                    "Put": {
+                        "TableName": TABLE_NAME,
+                        "Item": _serialize_item(credit_item),
+                        "ConditionExpression": "attribute_not_exists(pk)",
+                    }
+                },
+            ]
+        )
 
-if __name__ == "__main__":
-    example_payload = {
-        "account_number": "1001",
-        "sender_account_number": "1001",
-        "sender_account_name": "JEF Eggstore",
-        "receiver_account_number": "2001",
-        "receiver_account_name": "Supplier A",
-        "type": "debit",
-        "description": "Purchase of packaging materials",
-        "amount": 1250.50,
-        "created_by": "00001",
-        "ledger_id": "9e3d7b6c-3b2c-4a53-9f2e-3b0d5c2d8b44",
-    }
+        return {
+            "is_created": True,
+            "message": f"Created debit={debit_ledger_id} and credit={credit_ledger_id} for transaction_id={transaction_id}",
+            "ledger_id": debit_ledger_id,
+        }
 
-    resp = create_one_ledger(example_payload)
-    print(json.dumps(resp, indent=2, default=str))
+    except ClientError as e:
+        msg = e.response.get("Error", {}).get("Message", str(e))
+        return {"is_created": False, "message": f"DynamoDB error: {msg}", "ledger_id": ""}
+
+# ----------------------------
+# EXAMPLE (optional)
+# ----------------------------
+# payload = {
+#     "creator_account_number": "1006",
+#     "sender_account_number": "1006",
+#     "sender_account_name": "JEF Minimart",
+#     "receiver_account_number": "1010",
+#     "receiver_account_name": "Internal - Caferimo Coffee Shop - Loboc",
+#     "description": "Test transfer",
+#     "amount": 123.45,
+#     "created_by": "00001",
+#     "transaction_id": str(uuid4()),
+# }
+# print(create_double_entry(payload))
