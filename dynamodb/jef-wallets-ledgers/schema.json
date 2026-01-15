@@ -4,6 +4,8 @@
         "pk":"string",
         "gsi_1_pk":"string",
         "gsi_1_sk":"string", 
+        "gsi_2_pk":"string",
+        "gsi_2_sk":"string", 
         "account_number":"string", 
         "sender_account_number":"string",
         "sender_account_name":"string",
@@ -23,9 +25,14 @@
         "pk":"<ledger_id>"
     },
     "gsi_1":{
-        "gsi_1_pk":"<account_number>",
+        "gsi_1_pk":"<sender_account_number>",
         "gsi_1_sk":"<created>#<ledger_id>"
+    },
+    "gsi_2":{
+        "gsi_2_pk":"<receiver_account_number>",
+        "gsi_2_sk":"<created>#<ledger_id>"
     }
+
 
 
 }

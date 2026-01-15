@@ -50,12 +50,10 @@ def validate_item(item):
     if not isinstance(item, dict):
         raise ValueError("Each item must be an object/dict")
 
-    # pk required
     pk = _as_str(item.get("pk"))
     if not pk:
         raise ValueError("Missing/invalid pk")
 
-    # ledger_id must match pk
     ledger_id = item.get("ledger_id")
     if ledger_id is None:
         item["ledger_id"] = pk
@@ -66,9 +64,7 @@ def validate_item(item):
         if ledger_id != pk:
             raise ValueError("ledger_id must match pk")
 
-    # Required string fields (new schema)
     required_str = (
-        "account_number",
         "sender_account_number",
         "sender_account_name",
         "receiver_account_number",
@@ -88,16 +84,31 @@ def validate_item(item):
     if item["type"] not in ("credit", "debit"):
         raise ValueError("type must be credit|debit")
 
-    # amount required number
     item["amount"] = _to_decimal(item.get("amount"))
     if item["amount"] is None:
         raise ValueError("Missing/invalid amount")
 
-    # Derive indexes (new schema)
-    item["gsi_1_pk"] = _as_str(item["account_number"])
-    item["gsi_1_sk"] = f'{_as_str(item["created"])}#{_as_str(item["ledger_id"])}'
+    # New schema:
+    # gsi_1_pk = sender_account_number
+    # gsi_2_pk = receiver_account_number
+    # *_sk = created#ledger_id
+    sender_acct = _as_str(item.get("sender_account_number"))
+    receiver_acct = _as_str(item.get("receiver_account_number"))
+    created = _as_str(item.get("created"))
+    lid = _as_str(item.get("ledger_id"))
 
-    # Drop old fields if present (no longer in schema)
+    item["gsi_1_pk"] = sender_acct
+    item["gsi_1_sk"] = f"{created}#{lid}"
+
+    item["gsi_2_pk"] = receiver_acct
+    item["gsi_2_sk"] = f"{created}#{lid}"
+
+    # account_number is no longer used as an index source in your new schema.
+    # Keep it if present, but don't require it.
+    if "account_number" in item and not _as_str(item.get("account_number")):
+        item.pop("account_number", None)
+
+    # Drop old fields if present
     for k in ("balance_before", "balance_after"):
         if k in item:
             item.pop(k, None)
