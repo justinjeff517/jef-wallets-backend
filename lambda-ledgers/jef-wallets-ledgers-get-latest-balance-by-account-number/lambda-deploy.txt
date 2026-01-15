@@ -5,8 +5,8 @@
 
 # VARIABLES (easy find & replace)
 
-$PROJECT_DIR   = "H:\github16\jef-chat-backend\lambda-messages\jef-chat-messages-create-one-to-thread"
-$FUNCTION_NAME = "jef-chat-messages-create-one-to-thread"
+$PROJECT_DIR   = "H:\github12\jef-wallets-backend\lambda-ledgers\jef-wallets-ledgers-get-latest-balance-by-account-number"
+$FUNCTION_NAME = "jef-wallets-ledgers-get-latest-balance-by-account-number"
 $DESCRIPTION   = "jef-wallets"
 $ROLE_ARN      = "arn:aws:iam::246715082475:role/role-one"
 $RUNTIME       = "python3.13"
