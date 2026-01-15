@@ -5,8 +5,8 @@
 
 # VARIABLES (easy find & replace)
 
-$PROJECT_DIR   = "H:\github7\jef-minimart-backend\lambda\jef-minimart-get-total-cart-incentive-amount-by-employee-number"
-$FUNCTION_NAME = "jef-minimart-get-total-cart-incentive-amount-by-employee-number"
+$PROJECT_DIR   = "H:\github12\jef-wallets-backend\lambda-ledgers\jef-wallets-ledgers-create-one"
+$FUNCTION_NAME = "jef-wallets-ledgers-create-one"
 $DESCRIPTION   = "jef-wallets"
 $ROLE_ARN      = "arn:aws:iam::246715082475:role/role-one"
 $RUNTIME       = "python3.13"

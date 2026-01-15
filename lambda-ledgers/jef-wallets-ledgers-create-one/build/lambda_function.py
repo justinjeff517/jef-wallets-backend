@@ -41,40 +41,27 @@ def _to_decimal(v):
     return None
 
 def _fmt_date_name(dt):
-    # "Month, Day, Year, Weekday"
     return dt.strftime("%B, %-d, %Y, %A") if os.name != "nt" else dt.strftime("%B, %#d, %Y, %A")
 
 def _fmt_created_name(dt):
-    # "Month, Day, Year, Weekday, Hour Minute AM/PM"
     day = dt.strftime("%-d") if os.name != "nt" else dt.strftime("%#d")
     return dt.strftime(f"%B, {day}, %Y, %A, %-I:%M %p") if os.name != "nt" else dt.strftime(f"%B, {day}, %Y, %A, %#I:%M %p")
 
+def _jsonable(v):
+    if isinstance(v, Decimal):
+        return float(v)
+    return v
+
+def _safe_json_loads(s):
+    try:
+        return json.loads(s) if isinstance(s, str) and s.strip() else None
+    except Exception:
+        return None
+
 # ----------------------------
-# MAIN
+# CORE
 # ----------------------------
 def create_one_ledger(payload: dict):
-    """
-    Payload format:
-    {
-        "account_number":"string",
-        "sender_account_number":"string",
-        "sender_account_name":"string",
-        "receiver_account_number":"string",
-        "receiver_account_name":"string",
-        "type":"credit|debit",
-        "description":"string",
-        "amount":"number",
-        "created_by":"string",
-        "ledger_id":"string-uuidv4"
-    }
-
-    Response format:
-    {
-        "is_created": boolean,
-        "message": string,
-        "ledger_id": string
-    }
-    """
     p = payload or {}
 
     account_number = _as_str(p.get("account_number"))
@@ -97,21 +84,12 @@ def create_one_ledger(payload: dict):
     if amount is None or amount <= 0:
         return {"is_created": False, "message": "amount must be a positive number", "ledger_id": ledger_id}
 
-    # Optional but recommended integrity check (based on your earlier assumption)
-    # If you really want to enforce it, uncomment:
-    # if account_number != sender_account_number:
-    #     return {"is_created": False, "message": "account_number must match sender_account_number", "ledger_id": ledger_id}
-
     now = datetime.now(_TZ_MANILA)
     created_iso = now.isoformat(timespec="seconds")
     date_str = now.strftime("%Y-%m-%d")
     date_name = _fmt_date_name(now)
     created_name = _fmt_created_name(now)
 
-    # NOTE:
-    # You didn't include balance_before/balance_after in the create payload/response.
-    # This write stores a "pending" ledger item without balances.
-    # If you want balances computed here, you need a "latest balance" query + concurrency control per account.
     item = {
         "pk": ledger_id,
         "gsi_1_pk": account_number,
@@ -142,27 +120,34 @@ def create_one_ledger(payload: dict):
         code = (e.response or {}).get("Error", {}).get("Code", "")
         if code == "ConditionalCheckFailedException":
             return {"is_created": False, "message": "ledger_id already exists", "ledger_id": ledger_id}
-        return {"is_created": False, "message": f"DynamoDB error: {code}", "ledger_id": ledger_id}
+        msg = (e.response or {}).get("Error", {}).get("Message", "")
+        return {"is_created": False, "message": f"DynamoDB error: {code} {msg}".strip(), "ledger_id": ledger_id}
     except Exception as e:
         return {"is_created": False, "message": f"Unexpected error: {str(e)}", "ledger_id": ledger_id}
 
+# ----------------------------
+# SQS LAMBDA HANDLER
+# ----------------------------
+def lambda_handler(event, context):
+    records = (event or {}).get("Records") or []
+    results = []
 
-# ----------------------------
-# EXAMPLE
-# ----------------------------
-if __name__ == "__main__":
-    example_payload = {
-        "account_number": "1001",
-        "sender_account_number": "1001",
-        "sender_account_name": "JEF Eggstore",
-        "receiver_account_number": "2001",
-        "receiver_account_name": "Supplier A",
-        "type": "debit",
-        "description": "Purchase of packaging materials",
-        "amount": 1250.50,
-        "created_by": "00001",
-        "ledger_id": "9e3d7b6c-3b2c-4a53-9f2e-3b0d5c2d8b44",
+    for r in records:
+        body_raw = r.get("body", "")
+        payload = _safe_json_loads(body_raw)
+
+        if not isinstance(payload, dict):
+            results.append({"is_created": False, "message": "Invalid JSON body", "ledger_id": ""})
+            continue
+
+        res = create_one_ledger(payload)
+        results.append(res)
+
+        if not res.get("is_created"):
+            raise Exception(json.dumps({"message": "Failed to create ledger", "result": res}, default=_jsonable))
+
+    return {
+        "ok": True,
+        "processed": len(records),
+        "results": results,
     }
-
-    resp = create_one_ledger(example_payload)
-    print(json.dumps(resp, indent=2, default=str))

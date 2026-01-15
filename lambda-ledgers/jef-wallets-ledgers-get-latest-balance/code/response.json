@@ -1,0 +1,6 @@
+{
+    "exists":"boolean",
+    "message":"string",
+    "reference_date_name":"string", 
+    "latest_balance":"number"
+}

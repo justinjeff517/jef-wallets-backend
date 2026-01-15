@@ -1,0 +1,4 @@
+{
+    "is_sent":"boolean",
+    "message":"string"
+}

@@ -7,9 +7,6 @@ import boto3
 from botocore.config import Config
 from boto3.dynamodb.conditions import Key
 
-# ----------------------------
-# CONFIG
-# ----------------------------
 AWS_REGION = (os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "ap-southeast-1").strip()
 TABLE_NAME = (os.getenv("WALLETS_LEDGERS_TABLE") or "jef-wallets-ledgers").strip()
 GSI_1_NAME = (os.getenv("WALLETS_LEDGERS_GSI_1_NAME") or "gsi_1").strip()
@@ -24,9 +21,6 @@ ddb = boto3.resource(
 
 table = ddb.Table(TABLE_NAME)
 
-# ----------------------------
-# HELPERS
-# ----------------------------
 def _as_str(v):
     return v.strip() if isinstance(v, str) else ""
 
@@ -51,27 +45,47 @@ def _parse_iso_dt(s: str):
     except Exception:
         return None
 
-def _fmt_hhmmss_from_seconds(total_seconds: int) -> str:
-    if total_seconds < 0:
-        total_seconds = 0
-    h = total_seconds // 3600
-    m = (total_seconds % 3600) // 60
-    s = total_seconds % 60
-    return f"{h:02d}:{m:02d}:{s:02d}"
-
-def _elapsed_time(created_iso: str) -> str:
+def _human_age(created_iso: str) -> str:
     dt = _parse_iso_dt(created_iso)
     if not dt:
         return ""
 
-    dt_mnl = dt.astimezone(_TZ_MANILA)
-    now_mnl = datetime.now(_TZ_MANILA)
+    now = datetime.now(_TZ_MANILA)
+    dt = dt.astimezone(_TZ_MANILA)
 
-    if dt_mnl.date() == now_mnl.date():
-        delta = now_mnl - dt_mnl
-        return _fmt_hhmmss_from_seconds(int(delta.total_seconds()))
-    else:
-        return dt_mnl.strftime("%m:%d")
+    delta = now - dt
+    total_seconds = int(delta.total_seconds())
+    if total_seconds < 0:
+        total_seconds = 0
+
+    # seconds / minutes / hours
+    if total_seconds < 60:
+        return f"{total_seconds} s ago"
+    if total_seconds < 3600:
+        m = total_seconds // 60
+        s = total_seconds % 60
+        if s == 0:
+            return f"{m}m ago"
+        return f"{m}m {s} s ago"
+    if total_seconds < 86400:
+        h = total_seconds // 3600
+        rem = total_seconds % 3600
+        m = rem // 60
+        if m == 0:
+            return f"{h} hours ago" if h != 1 else "1 hour ago"
+        return f"{h} hours {m}m ago" if h != 1 else f"1 hour {m}m ago"
+
+    # days
+    days = total_seconds // 86400
+    if days < 30:
+        return f"{days} days ago" if days != 1 else "1 day ago"
+
+    # months + days (approx: 30d/month)
+    months = days // 30
+    rem_days = days % 30
+    if rem_days == 0:
+        return f"{months} months ago" if months != 1 else "1 month ago"
+    return f"{months} months {rem_days} days ago" if months != 1 else f"1 month {rem_days} days ago"
 
 def _pick_ledger_fields(it: dict) -> dict:
     created_iso = _as_str(it.get("created"))
@@ -92,7 +106,7 @@ def _pick_ledger_fields(it: dict) -> dict:
         "balance_before": _to_jsonable(it.get("balance_before", 0)),
         "amount": _to_jsonable(it.get("amount", 0)),
         "balance_after": _to_jsonable(it.get("balance_after", 0)),
-        "elapsed_time": _elapsed_time(created_iso),
+        "elapsed_time": _human_age(created_iso),
     }
 
 def _sort_by_created_iso(ledgers: list) -> list:
@@ -104,9 +118,6 @@ def _sort_by_created_iso(ledgers: list) -> list:
             return float("-inf")
     return sorted(ledgers, key=keyfn)
 
-# ----------------------------
-# CORE
-# ----------------------------
 def get_ledgers_by_account_number(account_number: str, limit: int = 200) -> dict:
     account_number = _as_str(account_number)
     if not account_number:
@@ -116,7 +127,7 @@ def get_ledgers_by_account_number(account_number: str, limit: int = 200) -> dict
         resp = table.query(
             IndexName=GSI_1_NAME,
             KeyConditionExpression=Key("gsi_1_pk").eq(account_number),
-            ScanIndexForward=True,  # ascending by created#ledger_id
+            ScanIndexForward=True,
             Limit=limit,
         )
         items = resp.get("Items", []) or []
@@ -132,13 +143,9 @@ def get_ledgers_by_account_number(account_number: str, limit: int = 200) -> dict
 
     return {"exists": exists, "message": message, "ledgers": ledgers}
 
-# ----------------------------
-# LAMBDA HANDLER
-# ----------------------------
 def lambda_handler(event, context=None):
     payload = event or {}
 
-    # API Gateway / Lambda proxy support
     if isinstance(payload, dict) and isinstance(payload.get("body"), str):
         try:
             payload = json.loads(payload["body"])
@@ -157,5 +164,4 @@ def lambda_handler(event, context=None):
 
     return out
 
-# Example:
 print(get_ledgers_by_account_number("1001"))
