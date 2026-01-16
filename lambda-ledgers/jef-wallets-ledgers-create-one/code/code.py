@@ -1,5 +1,5 @@
 import os
-from uuid import uuid4
+from uuid import uuid5, uuid4, NAMESPACE_URL
 from decimal import Decimal, InvalidOperation
 from datetime import datetime, timezone, timedelta
 
@@ -8,14 +8,8 @@ from botocore.config import Config
 from botocore.exceptions import ClientError
 from boto3.dynamodb.types import TypeSerializer
 
-# ----------------------------
-# CONFIG
-# ----------------------------
 AWS_REGION = (os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "ap-southeast-1").strip()
 TABLE_NAME = (os.getenv("WALLETS_LEDGERS_TABLE") or "jef-wallets-ledgers").strip()
-
-# DynamoDB GSI names (set these env vars if your actual index names differ)
-GSI3_NAME = (os.getenv("WALLETS_LEDGERS_GSI3_NAME") or "gsi_3").strip()
 
 _TZ_MANILA = timezone(timedelta(hours=8))
 
@@ -27,9 +21,6 @@ ddb = boto3.client(
 
 _ser = TypeSerializer()
 
-# ----------------------------
-# HELPERS
-# ----------------------------
 def _as_str(v):
     return v.strip() if isinstance(v, str) else ""
 
@@ -66,48 +57,26 @@ def _serialize_item(py_item):
     clean = {k: v for k, v in py_item.items() if v is not None}
     return {k: _ser.serialize(v) for k, v in clean.items()}
 
-def _transaction_exists(transaction_id):
-    # Query GSI_3 by transaction_id (partition key)
+def _ledger_id_from_tx(transaction_id: str, entry_type: str) -> str:
+    return str(uuid5(NAMESPACE_URL, f"jef-wallets-ledgers:{transaction_id}:{entry_type}"))
+
+def _pk_for(transaction_id: str, entry_type: str) -> str:
+    # MATCHES YOUR SCHEMA: pk = "<transaction_id>#<type>"
+    return f"{transaction_id}#{entry_type}"
+
+def _pk_exists(pk: str) -> bool:
     try:
-        resp = ddb.query(
+        resp = ddb.get_item(
             TableName=TABLE_NAME,
-            IndexName=GSI3_NAME,
-            KeyConditionExpression="#p = :p",
-            ExpressionAttributeNames={"#p": "gsi_3_pk"},
-            ExpressionAttributeValues={":p": {"S": transaction_id}},
+            Key={"pk": {"S": pk}},
+            ConsistentRead=True,
             ProjectionExpression="pk",
-            Limit=1,
         )
-        return (resp.get("Count") or 0) > 0
+        return "Item" in resp
     except ClientError:
-        # If index name is wrong or access denied, treat as "unknown" and allow create
         return False
 
-# ----------------------------
-# MAIN
-# ----------------------------
-def create_double_entry(payload, enforce_unique_transaction=True):
-    """
-    payload format:
-    {
-      "creator_account_number": "string",
-      "sender_account_number": "string",
-      "sender_account_name": "string",
-      "receiver_account_number": "string",
-      "receiver_account_name": "string",
-      "description": "string",
-      "amount": "number",
-      "created_by": "string",
-      "transaction_id": "string-uuidv4"
-    }
-
-    response format:
-    {
-      "is_created": bool,
-      "message": str,
-      "ledger_id": str
-    }
-    """
+def create_double_entry(payload):
     creator_account_number = _as_str(payload.get("creator_account_number"))
     sender_account_number = _as_str(payload.get("sender_account_number"))
     sender_account_name = _as_str(payload.get("sender_account_name"))
@@ -120,32 +89,34 @@ def create_double_entry(payload, enforce_unique_transaction=True):
 
     if not creator_account_number:
         return {"is_created": False, "message": "Missing creator_account_number", "ledger_id": ""}
-
     if not sender_account_number:
         return {"is_created": False, "message": "Missing sender_account_number", "ledger_id": ""}
-
     if not receiver_account_number:
         return {"is_created": False, "message": "Missing receiver_account_number", "ledger_id": ""}
-
     if not transaction_id:
         return {"is_created": False, "message": "Missing transaction_id", "ledger_id": ""}
-
     if amount is None or amount <= 0:
         return {"is_created": False, "message": "Invalid amount (must be > 0)", "ledger_id": ""}
 
-    # Your rule: debit item only if creator_account_number is sender_account_number
     if creator_account_number != sender_account_number:
         return {
             "is_created": False,
-            "message": "Rejected: creator_account_number must equal sender_account_number for debit creation",
+            "message": "Rejected: creator_account_number must equal sender_account_number",
             "ledger_id": "",
         }
 
     if created_by and not (len(created_by) == 5 and created_by.isdigit()):
         return {"is_created": False, "message": "Invalid created_by (must be 5 digits)", "ledger_id": ""}
 
-    if enforce_unique_transaction and _transaction_exists(transaction_id):
+    debit_pk = _pk_for(transaction_id, "debit")
+    credit_pk = _pk_for(transaction_id, "credit")
+
+    # Optional fast check (not required; transact condition is the real guard)
+    if _pk_exists(debit_pk) or _pk_exists(credit_pk):
         return {"is_created": False, "message": "Transaction already exists (transaction_id)", "ledger_id": ""}
+
+    debit_ledger_id = _ledger_id_from_tx(transaction_id, "debit")
+    credit_ledger_id = _ledger_id_from_tx(transaction_id, "credit")
 
     now = datetime.now(_TZ_MANILA)
     created = now.isoformat(timespec="seconds")
@@ -153,52 +124,63 @@ def create_double_entry(payload, enforce_unique_transaction=True):
     date_name = _fmt_date_name(now)
     created_name = _fmt_created_name(now)
 
-    debit_ledger_id = str(uuid4())
-    credit_ledger_id = str(uuid4())
-
-    # Debit item (indexed for sender via GSI_1)
+    # DEBIT (sender side) — GSI_1 = sender, GSI_2 = receiver
     debit_item = {
-        "pk": debit_ledger_id,
-        "ledger_id": debit_ledger_id,
+        "pk": debit_pk,
         "transaction_id": transaction_id,
-        "gsi_3_pk": transaction_id,
-        "gsi_3_sk": "debit",
+
         "gsi_1_pk": sender_account_number,
         "gsi_1_sk": f"{created}#{debit_ledger_id}",
+
+        "gsi_2_pk": receiver_account_number,
+        "gsi_2_sk": f"{created}#{debit_ledger_id}",
+
+        "ledger_id": debit_ledger_id,
         "creator_account_number": creator_account_number,
         "sender_account_number": sender_account_number,
         "sender_account_name": sender_account_name,
         "receiver_account_number": receiver_account_number,
         "receiver_account_name": receiver_account_name,
+
         "date": date,
         "date_name": date_name,
         "created": created,
         "created_name": created_name,
         "created_by": created_by,
+
         "type": "debit",
         "description": description,
         "amount": amount,
     }
 
-    # Credit item (indexed for receiver via GSI_2)
+    # CREDIT (receiver side) — GSI_1 = sender (still sender per your schema), GSI_2 = receiver
+    # NOTE: Your schema defines:
+    #   gsi_1_pk = <sender_account_number>
+    #   gsi_2_pk = <receiver_account_number>
+    # So both legs keep same pk targets; only sk differs by ledger_id.
     credit_item = {
-        "pk": credit_ledger_id,
-        "ledger_id": credit_ledger_id,
+        "pk": credit_pk,
         "transaction_id": transaction_id,
-        "gsi_3_pk": transaction_id,
-        "gsi_3_sk": "credit",
+
+        "gsi_1_pk": sender_account_number,
+        "gsi_1_sk": f"{created}#{credit_ledger_id}",
+
         "gsi_2_pk": receiver_account_number,
         "gsi_2_sk": f"{created}#{credit_ledger_id}",
+
+        "ledger_id": credit_ledger_id,
         "creator_account_number": creator_account_number,
         "sender_account_number": sender_account_number,
         "sender_account_name": sender_account_name,
         "receiver_account_number": receiver_account_number,
         "receiver_account_name": receiver_account_name,
+
         "date": date,
         "date_name": date_name,
         "created": created,
         "created_name": created_name,
         "created_by": created_by,
+
         "type": "credit",
         "description": description,
         "amount": amount,
@@ -223,29 +205,34 @@ def create_double_entry(payload, enforce_unique_transaction=True):
                 },
             ]
         )
-
         return {
             "is_created": True,
-            "message": f"Created debit={debit_ledger_id} and credit={credit_ledger_id} for transaction_id={transaction_id}",
+            "message": f"Created debit={debit_pk} and credit={credit_pk} for transaction_id={transaction_id}",
             "ledger_id": debit_ledger_id,
         }
 
     except ClientError as e:
+        code = e.response.get("Error", {}).get("Code", "")
         msg = e.response.get("Error", {}).get("Message", str(e))
+
+        if code in ("TransactionCanceledException", "ConditionalCheckFailedException"):
+            if _pk_exists(debit_pk) or _pk_exists(credit_pk):
+                return {"is_created": False, "message": "Transaction already exists (transaction_id)", "ledger_id": ""}
+
         return {"is_created": False, "message": f"DynamoDB error: {msg}", "ledger_id": ""}
 
-# ----------------------------
-# EXAMPLE (optional)
-# ----------------------------
-# payload = {
-#     "creator_account_number": "1006",
-#     "sender_account_number": "1006",
-#     "sender_account_name": "JEF Minimart",
-#     "receiver_account_number": "1010",
-#     "receiver_account_name": "Internal - Caferimo Coffee Shop - Loboc",
-#     "description": "Test transfer",
-#     "amount": 123.45,
-#     "created_by": "00001",
-#     "transaction_id": str(uuid4()),
-# }
-# print(create_double_entry(payload))
+
+# Example
+payload = {
+    "creator_account_number": "1006",
+    "sender_account_number": "1006",
+    "sender_account_name": "JEF Minimart",
+    "receiver_account_number": "1010",
+    "receiver_account_name": "Internal - Caferimo Coffee Shop - Loboc",
+    "description": "Test transfer",
+    "amount": 123.45,
+    "created_by": "00001",
+    "transaction_id": "afc344713bfe04c0",
+}
+
+print(create_double_entry(payload))

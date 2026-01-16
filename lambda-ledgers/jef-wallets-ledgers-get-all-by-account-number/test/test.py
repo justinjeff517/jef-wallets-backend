@@ -5,7 +5,12 @@ from botocore.config import Config
 from botocore.exceptions import ClientError
 
 AWS_REGION = (os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "ap-southeast-1").strip()
-LAMBDA_ARN = "arn:aws:lambda:ap-southeast-1:246715082475:function:jef-wallets-ledgers-get-all-by-account-number"
+
+# Update these for the NEW lambda
+LAMBDA_ARN = (
+    os.getenv("LAMBDA_ARN")
+    or "arn:aws:lambda:ap-southeast-1:246715082475:function:jef-wallets-ledgers-get-all-by-account-number"
+)
 
 client = boto3.client(
     "lambda",
@@ -13,9 +18,8 @@ client = boto3.client(
     config=Config(retries={"max_attempts": 10, "mode": "standard"}),
 )
 
-# Use ONE of these payloads, depending on what your Lambda expects:
+# NEW payload format
 payload = {
-    # "entity_number": "1001",
     "account_number": "1001",
 }
 
@@ -34,14 +38,26 @@ def invoke_lambda(payload: dict):
         text = raw.decode("utf-8", errors="replace").strip()
 
         try:
-            body = json.loads(text) if text else None
+            parsed = json.loads(text) if text else None
         except Exception:
-            body = text
+            parsed = None
+
+        # If the Lambda returns API Gateway proxy format, unwrap body
+        response_obj = parsed
+        if isinstance(parsed, dict) and "body" in parsed:
+            body_raw = parsed.get("body")
+            if isinstance(body_raw, str):
+                try:
+                    response_obj = json.loads(body_raw) if body_raw.strip() else None
+                except Exception:
+                    response_obj = body_raw
+            else:
+                response_obj = body_raw
 
         return {
             "status_code": status,
             "function_error": fn_err,
-            "response": body,
+            "response": response_obj,
             "raw": text,
         }
 

@@ -6,8 +6,6 @@
         "gsi_1_sk":"string", 
         "gsi_2_pk":"string",
         "gsi_2_sk":"string", 
-        "gsi_3_pk":"string", 
-        "gsi_3_sk":"string", 
         "transaction_id":"string",
         "creator_account_number":"string", 
         "sender_account_number":"string",
@@ -25,7 +23,7 @@
         "amount":"number"
     }, 
     "main_index":{
-        "pk":"<ledger_id>"
+        "pk":"<transaction_id>#<type>"
     },
     "gsi_1":{
         "gsi_1_pk":"<sender_account_number>",
@@ -34,12 +32,7 @@
     "gsi_2":{
         "gsi_2_pk":"<receiver_account_number>",
         "gsi_2_sk":"<created>#<ledger_id>"
-    },
-    "gsi_3":{
-        "gsi_3_pk":"<transaction_id>",
-        "gsi_3_sk":"<type>"
     }
-
 
 
 }

@@ -22,7 +22,9 @@ def _as_str(v):
     return v.strip() if isinstance(v, str) else ""
 
 def _to_number(v):
-    if isinstance(v, (int, float, Decimal)):
+    if isinstance(v, Decimal):
+        return v
+    if isinstance(v, (int, float)):
         return Decimal(str(v))
     if isinstance(v, str):
         s = v.strip()
@@ -44,8 +46,10 @@ def _parse_body(event):
         body = event.get("body")
         if body is None or body == "":
             return {}
-        if isinstance(body, (dict, list)):
-            return body if isinstance(body, dict) else {"_": body}
+        if isinstance(body, dict):
+            return body
+        if isinstance(body, list):
+            return {"_": body}
         try:
             return json.loads(body)
         except Exception:
@@ -63,24 +67,28 @@ def lambda_handler(event, context):
     p = _parse_body(event) or {}
 
     msg = {
-        "account_number": _as_str(p.get("account_number")),
+        "creator_account_number": _as_str(p.get("creator_account_number")),
         "sender_account_number": _as_str(p.get("sender_account_number")),
         "sender_account_name": _as_str(p.get("sender_account_name")),
         "receiver_account_number": _as_str(p.get("receiver_account_number")),
         "receiver_account_name": _as_str(p.get("receiver_account_name")),
-        "type": _as_str(p.get("type")),
         "description": _as_str(p.get("description")),
         "amount": _to_number(p.get("amount")),
         "created_by": _as_str(p.get("created_by")),
-        "ledger_id": _as_str(p.get("ledger_id")),
+        "transaction_id": _as_str(p.get("transaction_id")),
     }
 
-    missing = [k for k, v in msg.items() if v in (None, "")]
+    missing = []
+    for k, v in msg.items():
+        if k == "amount":
+            if v is None:
+                missing.append(k)
+        else:
+            if v == "":
+                missing.append(k)
+
     if missing:
         return _response(400, {"is_sent": False, "message": f"Missing/invalid fields: {', '.join(missing)}"})
-
-    if msg["type"] not in ("credit", "debit"):
-        return _response(400, {"is_sent": False, "message": "Invalid type. Must be 'credit' or 'debit'."})
 
     body = json.dumps(msg, default=_jsonable, separators=(",", ":"))
 

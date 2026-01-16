@@ -22,7 +22,7 @@ def _as_str(v):
 
 def _to_number(v):
     if isinstance(v, (int, float, Decimal)):
-        return v
+        return Decimal(str(v)) if not isinstance(v, Decimal) else v
     if isinstance(v, str):
         s = v.strip()
         if s == "":
@@ -35,6 +35,7 @@ def _to_number(v):
 
 def _jsonable(v):
     if isinstance(v, Decimal):
+        # keep JSON number-friendly; change to str(v) if you want exact decimal text
         return float(v)
     return v
 
@@ -42,24 +43,28 @@ def send_create_ledger_message(payload: dict):
     p = payload or {}
 
     msg = {
-        "account_number": _as_str(p.get("account_number")),
+        "creator_account_number": _as_str(p.get("creator_account_number")),
         "sender_account_number": _as_str(p.get("sender_account_number")),
         "sender_account_name": _as_str(p.get("sender_account_name")),
         "receiver_account_number": _as_str(p.get("receiver_account_number")),
         "receiver_account_name": _as_str(p.get("receiver_account_name")),
-        "type": _as_str(p.get("type")),
         "description": _as_str(p.get("description")),
         "amount": _to_number(p.get("amount")),
         "created_by": _as_str(p.get("created_by")),
-        "ledger_id": _as_str(p.get("ledger_id")),
+        "transaction_id": _as_str(p.get("transaction_id")),
     }
 
-    missing = [k for k, v in msg.items() if v in (None, "")]
+    missing = []
+    for k, v in msg.items():
+        if k == "amount":
+            if v is None:
+                missing.append(k)
+        else:
+            if v == "":
+                missing.append(k)
+
     if missing:
         return {"is_sent": False, "message": f"Missing/invalid fields: {', '.join(missing)}"}
-
-    if msg["type"] not in ("credit", "debit"):
-        return {"is_sent": False, "message": "Invalid type. Must be 'credit' or 'debit'."}
 
     body = json.dumps(msg, default=_jsonable, separators=(",", ":"))
 
@@ -77,17 +82,15 @@ def send_create_ledger_message(payload: dict):
 
 # Example:
 payload = {
-    "account_number": "1001",
-    "sender_account_number": "1001",
-    "sender_account_name": "JEF Main",
-    "receiver_account_number": "2001",
-    "receiver_account_name": "Supplier A",     
-    "type": "debit",
-    "description": "Payment for feed",
+    "creator_account_number": "1006",
+    "sender_account_number": "1006",
+    "sender_account_name": "JEF Minimart",
+    "receiver_account_number": "1010",
+    "receiver_account_name": "Internal - Caferimo Coffee Shop - Loboc",
+    "description": "Payment for supplies",
     "amount": 1250.75,
     "created_by": "00001",
-    "ledger_id": "b6c4a6a8-0b2a-4dbe-8f66-8c8f8c8f8c8f",
+    "transaction_id": "b6c4a6a8-0b2a-4dbe-8f66-8c8f8c8f8c8f",
 }
-
 
 print(send_create_ledger_message(payload))

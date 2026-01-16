@@ -1,24 +1,30 @@
 {
-    "exists":"boolean",
-    "message":"string",
-    "ledgers":[
+  "exists": "boolean",
+  "message": "string",
+  "account_number": "string",
+  "entries": [
+    {
+      "transaction_id": "string-uuidv4",
+      "created": "string-iso8601",
+      "created_name": "string-Month, Day, Year, Weekday, Hour Minute AM/PM",
+      "date": "string-YYYY-MM-DD",
+      "date_name": "string-Month, Day, Year, Weekday",
+      "description": "string",
+      "amount": "number",
+      "is_complete": "boolean",
+      "lines": [
         {
-            "account_number":"string", 
-            "sender_account_number":"string",
-            "sender_account_name":"string",
-            "receiver_account_number":"string",
-            "receiver_account_name":"string",
-            "ledger_id":"string-uuidv4",
-            "date":"string-YYYY-MM-DD",
-            "date_name":"string-Month, Day, Year, Weekday",
-            "created":"string-iso8601",
-            "created_name":"string-Month, Day, Year, Weekday, Hour Minute AM/PM", 
-            "created_by":"string-5-digits-employee-number",
-            "type":"string-credit|debit",
-            "description":"string",
-            "amount":"number",
-            "elapsed_time":"string"
-        } 
-    
-    ]
+          "type": "string-debit|credit",
+          "account_number": "string",
+          "account_name": "string",
+          "amount": "number"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "count": "number",
+    "debit_total": "number",
+    "credit_total": "number"
+  }
 }
