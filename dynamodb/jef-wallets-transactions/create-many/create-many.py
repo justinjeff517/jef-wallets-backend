@@ -12,9 +12,7 @@ TABLE_NAME = (os.getenv("WALLETS_TRANSACTIONS_TABLE") or "jef-wallets-transactio
 
 JSON_PATH = r"H:\github12\jef-wallets-backend\dynamodb\jef-wallets-transactions\create-many\datas.json"
 
-# Optional: if you want to use a named AWS profile on your machine
 AWS_PROFILE = (os.getenv("AWS_PROFILE") or "").strip()
-
 
 # -----------------------------
 # HELPERS
@@ -23,18 +21,32 @@ def _as_str(v):
     return v.strip() if isinstance(v, str) else ""
 
 def _to_decimal(obj):
-    # DynamoDB expects Decimal for numbers (boto3 will reject float by default in some cases)
     return json.loads(json.dumps(obj), parse_float=Decimal, parse_int=Decimal)
 
+def _derive_account_number(item: dict) -> str:
+    typ = _as_str(item.get("type"))
+    if typ == "sender":
+        return _as_str(item.get("sender_account_number"))
+    if typ == "receiver":
+        return _as_str(item.get("receiver_account_number"))
+    return ""
+
 def _ensure_keys(item: dict) -> dict:
-    # Fill derived/index fields if missing
     txid = _as_str(item.get("transaction_id"))
     typ = _as_str(item.get("type"))
     created = _as_str(item.get("created"))
 
-    if not _as_str(item.get("pk")) and txid and typ:
-        item["pk"] = f"{txid}#{typ}"
+    # account_number (owner of this row)
+    if not _as_str(item.get("account_number")):
+        item["account_number"] = _derive_account_number(item)
 
+    acct = _as_str(item.get("account_number"))
+
+    # pk: make unique per account + type (safer than txid#type)
+    if not _as_str(item.get("pk")) and txid and acct and typ:
+        item["pk"] = f"{txid}#{acct}#{typ}"
+
+    # GSIs (keep as-is)
     if not _as_str(item.get("gsi_1_pk")):
         item["gsi_1_pk"] = _as_str(item.get("sender_account_number"))
     if not _as_str(item.get("gsi_1_sk")):
@@ -45,8 +57,14 @@ def _ensure_keys(item: dict) -> dict:
     if not _as_str(item.get("gsi_2_sk")):
         item["gsi_2_sk"] = created
 
-    return item
+    # basic validations
+    if typ not in ("sender", "receiver"):
+        raise ValueError(f"Invalid type. Must be 'sender' or 'receiver'. Item: {item}")
 
+    if not acct:
+        raise ValueError(f"Missing account_number (could not derive). Item: {item}")
+
+    return item
 
 # -----------------------------
 # LOAD JSON
