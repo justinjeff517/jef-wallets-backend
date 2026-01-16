@@ -18,12 +18,8 @@ GSI_2_NAME = (os.getenv("WALLETS_TRANSACTIONS_GSI2_NAME") or "gsi_2").strip()  #
 # -----------------------------
 # RCU FREE-TIER / THROTTLE
 # -----------------------------
-# Set this to your desired read budget per second (free-tier-ish default: 25).
-# If you want 22 specifically, set env: RCU_LIMIT_PER_SECOND=22
 RCU_LIMIT_PER_SECOND = float(os.getenv("RCU_LIMIT_PER_SECOND", "25") or 25)
-# Use only part of the budget for headroom (e.g., 0.9 means 90% of budget)
 RCU_HEADROOM = float(os.getenv("RCU_HEADROOM", "0.9") or 0.9)
-# Optional: cap page size to reduce burst reads
 QUERY_PAGE_LIMIT = int(os.getenv("QUERY_PAGE_LIMIT", "200") or 200)
 
 _RCU_BUDGET = max(0.0, RCU_LIMIT_PER_SECOND * RCU_HEADROOM)
@@ -43,7 +39,7 @@ class _PerSecondRcuLimiter:
 
     def add_and_throttle(self, consumed_rcu: float):
         if self.budget <= 0:
-            return  # disabled
+            return
 
         self._reset_if_needed()
         self._used += float(consumed_rcu or 0.0)
@@ -109,6 +105,7 @@ def _query_all(IndexName: str, pk_name: str, pk_value: str, scan_forward: bool =
 
 def _map_sender(item: Dict[str, Any]) -> Dict[str, Any]:
     return {
+        "transaction_id": _as_str(item.get("transaction_id")),
         "counterparty_account_number": _as_str(item.get("receiver_account_number")),
         "counterparty_account_name": _as_str(item.get("receiver_account_name")),
         "date": _as_str(item.get("date")),
@@ -124,6 +121,7 @@ def _map_sender(item: Dict[str, Any]) -> Dict[str, Any]:
 
 def _map_receiver(item: Dict[str, Any]) -> Dict[str, Any]:
     return {
+        "transaction_id": _as_str(item.get("transaction_id")),
         "counterparty_account_number": _as_str(item.get("sender_account_number")),
         "counterparty_account_name": _as_str(item.get("sender_account_name")),
         "date": _as_str(item.get("date")),

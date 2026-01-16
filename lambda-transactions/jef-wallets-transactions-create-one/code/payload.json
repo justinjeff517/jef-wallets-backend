@@ -1,0 +1,11 @@
+{
+    "account_number":"string", 
+    "sender_account_number":"string",
+    "sender_account_name":"string",
+    "receiver_account_number":"string",
+    "receiver_account_name":"string",
+    "description":"string",
+    "amount":"number",
+    "transaction_id":"string-uuidv4",
+    "created_by":"string-employee_number"
+}

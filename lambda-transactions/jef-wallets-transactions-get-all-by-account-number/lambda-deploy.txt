@@ -1,0 +1,150 @@
+# =========================
+# LAMBDA DEPLOY TEMPLATE
+# (Edit variables below)
+# =========================
+
+# VARIABLES (easy find & replace)
+
+$PROJECT_DIR   = "H:\github12\jef-wallets-backend\lambda-transactions\jef-wallets-transactions-get-all-by-account-number"
+$FUNCTION_NAME = "jef-wallets-transactions-get-all-by-account-number"
+$DESCRIPTION   = "jef-wallets"
+$ROLE_ARN      = "arn:aws:iam::246715082475:role/role-one"
+$RUNTIME       = "python3.13"
+$HANDLER       = "lambda_function.lambda_handler"
+$REGION        = "ap-southeast-1"
+$RESERVED_CONCURRENCY = 5
+$LIBS = @("ably","python-dotenv")
+
+
+# add more libs in this array if needed
+
+# Helper: join libs for pip
+function Join-Libs($libs) {
+  if (-not $libs -or $libs.Count -eq 0) { return "" }
+  return ($libs -join " ")
+}
+
+function Set-ReservedConcurrency {
+  param(
+    [string]$FunctionName,
+    [int]$Reserved
+  )
+
+  if ($Reserved -ge 0) {
+    aws lambda put-function-concurrency `
+      --function-name $FunctionName `
+      --reserved-concurrent-executions $Reserved `
+      --region $REGION
+  }
+}
+
+# ---------------------------------
+# CREATE FUNCTION WITH IMPORTED LIBS
+# ---------------------------------
+
+
+Set-Location $PROJECT_DIR
+
+if (Test-Path ".\build") { Remove-Item ".\build" -Recurse -Force }
+New-Item -ItemType Directory -Path ".\build" | Out-Null
+
+if ($LIBS -and $LIBS.Count -gt 0) {
+  python -m pip install --upgrade @($LIBS) -t ".\build"
+}
+
+Copy-Item ".\lambda_function.py" ".\build\" -Force
+
+if (Test-Path ".\function.zip") { Remove-Item ".\function.zip" -Force }
+Compress-Archive -Path ".\build\*" -DestinationPath ".\function.zip" -Force
+
+aws lambda create-function `
+  --function-name $FUNCTION_NAME `
+  --description "$DESCRIPTION" `
+  --runtime $RUNTIME `
+  --role $ROLE_ARN `
+  --handler $HANDLER `
+  --zip-file fileb://function.zip `
+  --region $REGION
+
+aws lambda put-function-concurrency `
+  --function-name $FUNCTION_NAME `
+  --reserved-concurrent-executions $RESERVED_CONCURRENCY `
+  --region $REGION
+
+Set-ReservedConcurrency -FunctionName $FUNCTION_NAME -Reserved $RESERVED_CONCURRENCY
+
+
+# ---------------------------------
+# CREATE FUNCTION WITH NO IMPORTED LIBS
+# ---------------------------------
+
+Set-Location $PROJECT_DIR
+
+if (Test-Path .\build) { Remove-Item .\build -Recurse -Force }
+New-Item -ItemType Directory -Path .\build | Out-Null
+
+Copy-Item .\lambda_function.py .\build\
+
+if (Test-Path .\function.zip) { Remove-Item .\function.zip -Force }
+Compress-Archive -Path .\lambda_function.py -DestinationPath .\function.zip -Force
+
+aws lambda create-function `
+  --function-name $FUNCTION_NAME `
+  --description "$DESCRIPTION" `
+  --runtime $RUNTIME `
+  --role $ROLE_ARN `
+  --handler $HANDLER `
+  --zip-file fileb://function.zip `
+  --region $REGION
+
+Set-ReservedConcurrency -FunctionName $FUNCTION_NAME -Reserved $RESERVED_CONCURRENCY
+
+
+# ---------------------------------
+# UPDATE FUNCTION WITH NO IMPORTED LIBS
+# ---------------------------------
+
+Set-Location $PROJECT_DIR
+
+if (Test-Path .\build) { Remove-Item .\build -Recurse -Force }
+if (Test-Path .\function.zip) { Remove-Item .\function.zip -Force }
+
+New-Item -ItemType Directory -Path .\build | Out-Null
+
+Copy-Item .\lambda_function.py .\build\
+
+Compress-Archive -Path .\build\* -DestinationPath .\function.zip -Force
+
+aws lambda update-function-code `
+  --function-name $FUNCTION_NAME `
+  --zip-file fileb://function.zip `
+  --region $REGION
+
+Set-ReservedConcurrency -FunctionName $FUNCTION_NAME -Reserved $RESERVED_CONCURRENCY
+
+
+# ---------------------------------
+# UPDATE FUNCTION WITH IMPORTED LIBS
+# ---------------------------------
+Set-Location $PROJECT_DIR
+
+if (Test-Path .\build) { Remove-Item .\build -Recurse -Force }
+New-Item -ItemType Directory -Path .\build | Out-Null
+
+
+if ($LIBS -and $LIBS.Count -gt 0) {
+  python -m pip install --upgrade @($LIBS) -t .\build
+}
+
+
+Copy-Item .\lambda_function.py .\build\ -Force
+
+
+if (Test-Path .\function.zip) { Remove-Item .\function.zip -Force }
+Compress-Archive -Path .\build\* -DestinationPath .\function.zip -Force
+
+
+aws lambda update-function-code `
+  --function-name $FUNCTION_NAME `
+  --zip-file fileb://function.zip `
+  --region $REGION
