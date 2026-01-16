@@ -1,5 +1,0 @@
-{
-    "is_created":"boolean",
-    "message":"string",
-    "ledger_id":"string"
-}

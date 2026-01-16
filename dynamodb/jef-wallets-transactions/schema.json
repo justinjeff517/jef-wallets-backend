@@ -1,0 +1,37 @@
+{ 
+    "table":"jef-wallets-transactions",
+    "attributes":{
+        "pk":"string",
+        "gsi_1_pk":"string",
+        "gsi_1_sk":"string", 
+        "gsi_2_pk":"string",
+        "gsi_2_sk":"string", 
+        "transaction_id":"string",
+        "creator_account_number":"string", 
+        "sender_account_number":"string",
+        "sender_account_name":"string",
+        "receiver_account_number":"string",
+        "receiver_account_name":"string",
+        "date":"string-YYYY-MM-DD",
+        "date_name":"string-Month, Day, Year, Weekday",
+        "created":"string-iso8601",
+        "created_name":"string-Month, Day, Year, Weekday, Hour Minute AM/PM", 
+        "created_by":"string-5-digits-employee-number",
+        "type":"string-sender|receiver",
+        "description":"string",
+        "amount":"number"
+    }, 
+    "main_index":{
+        "pk":"<transaction_id>#<type>"
+    },
+    "gsi_1":{
+        "gsi_1_pk":"<sender_account_number>",
+        "gsi_1_sk":"<created>"
+    },
+    "gsi_2":{
+        "gsi_2_pk":"<receiver_account_number>",
+        "gsi_2_sk":"<created>"
+    }
+
+
+}
